@@ -27,9 +27,10 @@
   const rtdb = firebase.database();
 
   // ── Estado ──────────────────────────────────────────
-  let _refActual      = null;
-  let _ultimoGuardado = 0;
-  let _ignorarProximo = false;
+  let _refActual       = null;
+  let _ultimoGuardado  = 0;
+  let _ignorarProximo  = false;
+  let _aplicandoRemoto = false; // bloquea pushes mientras se aplica un cambio remoto
 
   // ── Device ID único ──────────────────────────────────
   if (!localStorage.getItem('rf_device_id')) {
@@ -69,18 +70,23 @@
         console.warn('⚠️ Remoto vacío, manteniendo datos locales');
         return;
       }
+      _aplicandoRemoto = true; // bloquear cualquier push durante este proceso
       window.DB = window.runMigrations ? window.runMigrations(parsed) : parsed;
       window._ultimoSyncTs = remote.updatedAt || Date.now();
       window.saveEstabActivo?.();
       window.init?.();
       setSyncStatus('ok');
+      // Liberar el bloqueo después de que termine el ciclo de render
+      setTimeout(() => { _aplicandoRemoto = false; }, 800);
     } catch(e) {
+      _aplicandoRemoto = false;
       console.warn('Error aplicando remoto:', e);
     }
   }
 
   // ── Push a Firebase ──────────────────────────────────
   window.pushSyncFirebase = function(forzar) {
+    if (_aplicandoRemoto) return; // no pushear mientras se procesa un cambio remoto
     if (!window.ESTAB_ID_ACTIVO) return;
     // No pushear si DB no tiene datos reales
     if (!window.DB || !Array.isArray(window.DB.animales)) return;
@@ -105,8 +111,8 @@
 
     _refActual = rtdb.ref('establecimientos/' + estabId);
 
-    // Carga inicial
-    _refActual.once('value').then(snap => {
+    // Carga inicial (esperable)
+    const cargaInicial = _refActual.once('value').then(snap => {
       if (!snap.exists()) return;
       const remote = snap.val();
       if (remote.deviceId !== window._rfDeviceId &&
@@ -132,6 +138,7 @@
 
     setSyncStatus('ok');
     console.log('🔥 Firebase RTDB Sync listo. Device:', window._rfDeviceId);
+    return cargaInicial;
   };
 
   // ── Detener sync ─────────────────────────────────────
@@ -6127,11 +6134,17 @@ async function cambiarEstablecimiento(id) {
   } else {
     DB = dbVacia('Establecimiento');
   }
+  window.DB = DB;
 
-  // Re-renderizar toda la app
   cerrarModalEstab();
+
+  // Sincronizar PRIMERO (trae los datos reales de Firebase si los hay),
+  // recién después renderizar — así init() no pushea datos a medio cargar
+  if (window.iniciarSync) {
+    await window.iniciarSync(id);
+    await new Promise(r => setTimeout(r, 600)); // dar tiempo a que aplique datos remotos
+  }
   init();
-  if (window.iniciarSync) window.iniciarSync(id);
   toast('Establecimiento cambiado ✅', 'ok');
 }
 
