@@ -6209,6 +6209,8 @@ async function renderSelectorEstab() {
 
 function abrirModalEstab() {
   renderSelectorEstab();
+  const codigoEl = document.getElementById('codigo-estab-actual');
+  if (codigoEl) codigoEl.textContent = window.ESTAB_ID_ACTIVO || '—';
   document.getElementById('modal-estab-selector').style.display = 'flex';
 }
 function cerrarModalEstab() {
@@ -6228,6 +6230,47 @@ function actualizarPanelSync() {
     const map   = {'📡':'Sincronizado y activo','⚠️':'Error de sync — revisá la conexión','📵':'Sin conexión – guardando localmente','⭕':'Sync desactivado'};
     txtEl.textContent = map[icon] || 'Desconocido';
   }
+}
+
+
+// ── Unirse a un establecimiento existente por código ──
+async function unirseAEstablecimiento(codigo) {
+  codigo = (codigo || '').trim();
+  if (!codigo.startsWith('estab_')) {
+    toast('Código inválido. Debe empezar con "estab_"', 'err');
+    return;
+  }
+  try {
+    // Verificar que exista en Firebase antes de unirse
+    const snap = await firebase.database().ref('establecimientos/' + codigo).once('value');
+    if (!snap.exists()) {
+      toast('No se encontró ese establecimiento. Verificá el código.', 'err');
+      return;
+    }
+    // Agregar a la lista local
+    const lista = await getEstablecimientos();
+    if (!lista.find(e => e.id === codigo)) {
+      const remote = snap.val();
+      let nombre = 'Establecimiento compartido';
+      try { nombre = JSON.parse(remote.data).settings?.establecimiento || nombre; } catch(e) {}
+      lista.push({ id: codigo, nombre, creadoEn: Date.now(), compartido: true });
+      await saveEstablecimientos(lista);
+    }
+    await cambiarEstablecimiento(codigo);
+    toast('¡Unido! Sincronizando datos...', 'ok');
+  } catch(e) {
+    toast('Error al unirse: ' + e.message, 'err');
+  }
+}
+
+// ── Copiar código del establecimiento activo ──
+function copiarCodigoEstab() {
+  const codigo = window.ESTAB_ID_ACTIVO || '';
+  navigator.clipboard.writeText(codigo).then(() => {
+    toast('Código copiado ✅', 'ok');
+  }).catch(() => {
+    prompt('Copiá este código manualmente:', codigo);
+  });
 }
 
 // ════════════════════════════════════════════
@@ -6418,11 +6461,26 @@ async function startBackupSystem() {
     </div>
     <div style="padding:16px 20px;max-height:60vh;overflow-y:auto">
       <div id="estab-lista-modal"></div>
+      <div style="background:var(--bg3);border-radius:8px;padding:10px 12px;margin-top:10px;font-size:12px">
+        <div style="color:var(--text2);font-weight:600;margin-bottom:4px">📋 Código de este establecimiento (compartilo para sincronizar otro dispositivo):</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <code id="codigo-estab-actual" style="flex:1;color:var(--green);word-break:break-all;font-size:11px"></code>
+          <button class="btn-icon" onclick="copiarCodigoEstab()" title="Copiar">📋</button>
+        </div>
+      </div>
       <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
         <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:8px">➕ Nuevo establecimiento</div>
         <div style="display:flex;gap:8px">
           <input type="text" id="input-nuevo-estab" class="form-control" placeholder="Nombre del campo / estancia" style="flex:1">
           <button class="btn-primary" onclick="crearNuevoEstablecimiento(document.getElementById('input-nuevo-estab').value);document.getElementById('input-nuevo-estab').value=''">Crear</button>
+        </div>
+      </div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+        <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:4px">🔗 Unirme a un establecimiento existente</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Pegá el código que te compartieron desde otro dispositivo para ver los mismos datos.</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="input-codigo-estab" class="form-control" placeholder="estab_..." style="flex:1;font-family:monospace;font-size:12px">
+          <button class="btn-secondary" onclick="unirseAEstablecimiento(document.getElementById('input-codigo-estab').value)">Unirme</button>
         </div>
       </div>
     </div>
