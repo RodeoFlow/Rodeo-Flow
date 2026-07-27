@@ -4182,134 +4182,11 @@ async function fetchPrices() {
   toast('Precios MAG + BNA actualizados ✅' + blueLabel, 'ok');
 }
 
-// ── Helper: trae HTML de una URL probando varios proxies CORS en cadena ──
-// (allorigins puede estar lento/caído; si falla, probamos con codetabs y corsproxy.io)
-async function fetchHTMLConProxy(url, timeoutMs = 15000) {
-  const intentos = [
-    { nombre: 'r.jina.ai', build: u => 'https://r.jina.ai/' + u, parse: async r => await r.text() },
-    { nombre: 'codetabs', build: u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u), parse: async r => await r.text() },
-    { nombre: 'allorigins', build: u => 'https://api.allorigins.win/get?url=' + encodeURIComponent(u), parse: async r => (await r.json()).contents || '' },
-    { nombre: 'corsproxy.io', build: u => 'https://corsproxy.io/?url=' + encodeURIComponent(u), parse: async r => await r.text() }
-  ];
-  for (const intento of intentos) {
-    try {
-      const r = await fetch(intento.build(url), { signal: AbortSignal.timeout(timeoutMs) });
-      if (!r.ok) continue;
-      const html = await intento.parse(r);
-      if (html && html.length > 5000) {
-        console.log('[Proxy] ' + intento.nombre + ' OK para ' + url + ' (' + html.length + ' caracteres)');
-        return html;
-      }
-      console.warn('[Proxy] ' + intento.nombre + ' respondió pero con contenido muy corto (' + (html ? html.length : 0) + ' caracteres), se descarta');
-    } catch (e) { console.warn('[Proxy] ' + intento.nombre + ' falló:', e.message); }
-  }
-  throw new Error('Todos los proxies CORS fallaron para ' + url);
-}
-
-// ── Índice Novillo Arrendamiento Semanal desde elrural.com ──────────────────
-async function fetchIndiceArrendamientoElRural() {
-  // Estrategia 1: elrural.com (con proxies en cadena)
-  const urlElRural = 'https://www.elrural.com/mercados/ganadero/precios-indicativos/indice-novillo-arrendamiento-precios-indicativos/';
-  try {
-    const html = await fetchHTMLConProxy(urlElRural);
-    // Buscar el valor del índice semanal en la tabla de elrural
-    const match = html.match(/Novillo\s+Arren\.?\s*Semanal[^<]{0,200}?(\d[\d.,]{3,8})/i)
-               || html.match(/arrendamiento[^<]{0,120}?(\d{3,4}[.,]\d{1,3})/i);
-    if (match) {
-      // Normalizar: "4.289,372" → 4289.372  |  "4289,37" → 4289.37
-      let raw = match[1].replace(/\./g,'').replace(',','.');
-      const val = parseFloat(raw);
-      if (val > 1000 && val < 20000) {
-        console.log('[ElRural] Índice arrendamiento semanal:', val);
-        return { valor: val, fuente: 'elrural.com (semanal)' };
-      }
-    }
-  } catch(e) { console.warn('[ElRural] scraping falló:', e.message); }
-
-  // Estrategia 2: MAG directo - INML semanal
-  try {
-    const urlMAG = 'https://www.mercadoagroganadero.com.ar/dll/hacienda2.dll/haciinfo000015';
-    const html2 = await fetchHTMLConProxy(urlMAG);
-    // La tabla MAG: buscar el valor numérico del índice
-    const m2 = html2.match(/[Íi]ndice\s+Arrendamiento[^<]{0,60}?(\d[\d.]{2,4}[,]\d{1,3})/i)
-            || html2.match(/<td[^>]*>\s*(\d[\d.]{2,4}[,]\d{1,3})\s*<\/td>/i);
-    if (m2) {
-      let raw2 = m2[1].replace(/\./g,'').replace(',','.');
-      const val2 = parseFloat(raw2);
-      if (val2 > 1000 && val2 < 20000) {
-        console.log('[MAG directo] Índice arrendamiento:', val2);
-        return { valor: val2, fuente: 'MAG (INML semanal)' };
-      }
-    }
-  } catch(e) { console.warn('[MAG] Falló scraping directo:', e.message); }
-
-  return { valor: null, fuente: null };
-}
-
-// ── Precios reales por categoría — MAG vía elrural.com (páginas estáticas, actualizadas por el mercado) ──
-async function fetchMAGCategoriasReal() {
-  const escapeRx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // Extrae [min, max] buscando la etiqueta de categoría y los dos números que la siguen en la fila de la tabla
-  function extraerMinMax(html, etiqueta) {
-    const rx = new RegExp(escapeRx(etiqueta) + '[\\s\\S]{1,600}?([\\d]{2,5}[.,]\\d{2})[\\s\\S]{1,200}?([\\d]{2,5}[.,]\\d{2})', 'i');
-    const m = html.match(rx);
-    if (!m) return null;
-    const min = parseFloat(m[1].replace(/\./g, '').replace(',', '.'));
-    const max = parseFloat(m[2].replace(/\./g, '').replace(',', '.'));
-    if (!(min > 100 && max > 100 && max >= min)) return null;
-    return { min, max, prom: Math.round((min + max) / 2) };
-  }
-  async function fetchHTML(url) {
-    return await fetchHTMLConProxy(url);
-  }
-
-  const resultado = { categorias: {}, fecha: null, ok: false };
-  try {
-    const html1 = await fetchHTML('https://www.elrural.com/mercados/ganadero/mercado-de-liniers/liniers-precios-1/');
-    console.log('[MAG diag] liniers-precios-1: ' + html1.length + ' caracteres | contiene "Novillos": ' + html1.includes('Novillos') + ' | contiene "431": ' + html1.includes('431'));
-    const fechaM = html1.match(/(\d{2}\/\d{2}\/\d{2})/);
-    if (fechaM) resultado.fecha = fechaM[1];
-
-    // Novillo: combinamos las 3 franjas de peso (431/460, 461/490, 491/520) en un único rango real
-    const brackets = ['Novillos 431/460', 'Novillos 461/490', 'Novillos 491/520']
-      .map(l => extraerMinMax(html1, l)).filter(Boolean);
-    if (brackets.length) {
-      const min = Math.min(...brackets.map(b => b.min));
-      const max = Math.max(...brackets.map(b => b.max));
-      resultado.categorias['Novillo'] = { min, max, prom: Math.round((min + max) / 2) };
-      resultado.ok = true;
-    } else if (html1.includes('431')) {
-      const idx = html1.indexOf('431');
-      console.warn('[MAG diag] "431" aparece pero no se pudo extraer min/max. Contexto: ' + html1.slice(Math.max(0,idx-40), idx+250));
-    }
-
-    const html2 = await fetchHTML('https://www.elrural.com/mercados/ganadero/mercado-de-liniers/liniers-precios-2/');
-    console.log('[MAG diag] liniers-precios-2: ' + html2.length + ' caracteres | contiene "Novillitos": ' + html2.includes('Novillitos') + ' | contiene "VAQ": ' + html2.includes('VAQ'));
-    const map2 = {
-      'Novillito': 'Novillitos Reg/esp',
-      'Vaquillona': 'VAQ. REG/ESP',
-      'Vaca Invernada': 'VACAS REG/ESP',
-      'Vaca Manufactura': 'VACAS CVA INF/BUE',
-      'Toro': 'TOROS REG/ESP'
-    };
-    Object.entries(map2).forEach(([cat, etiqueta]) => {
-      const v = extraerMinMax(html2, etiqueta);
-      if (v) { resultado.categorias[cat] = v; resultado.ok = true; }
-    });
-  } catch (e) { console.warn('[MAG categorías] scraping falló:', e.message); }
-
-  return resultado;
-}
-
+// ── Precios MAG: se leen del archivo precios-mag.json (mismo repo, sin CORS) ──
+// Ese archivo lo actualiza automáticamente un robot (GitHub Actions, una o dos
+// veces por día) que sí ejecuta el JavaScript de elrural.com con un navegador
+// headless — por eso consigue los números reales. Ver /scripts/scrape-precios.js
 async function fetchMAGPrices() {
-  // Índice de arrendamiento real (elrural/MAG) + precios reales por categoría (elrural/MAG), en paralelo
-  const [indiceData, catData] = await Promise.all([
-    fetchIndiceArrendamientoElRural(),
-    fetchMAGCategoriasReal()
-  ]);
-
-  // Categorías de referencia (no se consiguen scrapeadas hoy: Ternero M/H, Invernada M/H/Vientres, Vaquillona/Vaca detallada)
-  // Se muestran igual para no romper la tabla, pero claramente marcadas como "valor de referencia" en la fuente.
   const categoriasReferencia = {
     'Ternero M':{min:4400,prom:4800,max:5200},
     'Ternera H':{min:4200,prom:4600,max:5000},
@@ -4317,34 +4194,51 @@ async function fetchMAGPrices() {
     'Invernada Hembras':{min:3600,prom:3900,max:4250},
     'Invernada Vientres':{min:3400,prom:3700,max:4050}
   };
+  const fallbackCategorias = {
+    'Novillo':{min:3900,prom:4200,max:4550},
+    'Novillito':{min:4000,prom:4350,max:4700},
+    'Vaquillona':{min:3800,prom:4100,max:4400},
+    'Vaca Invernada':{min:3600,prom:3950,max:4300},
+    'Vaca Manufactura':{min:3200,prom:3500,max:3800},
+    'Toro':{min:3500,prom:3800,max:4100},
+    ...categoriasReferencia
+  };
 
-  const categoriasFull = catData.ok
-    ? { ...categoriasReferencia, ...catData.categorias }
-    : {
-        'Novillo':{min:3900,prom:4200,max:4550},
-        'Novillito':{min:4000,prom:4350,max:4700},
-        'Vaquillona':{min:3800,prom:4100,max:4400},
-        'Vaca Invernada':{min:3600,prom:3950,max:4300},
-        'Vaca Manufactura':{min:3200,prom:3500,max:3800},
-        'Toro':{min:3500,prom:3800,max:4100},
-        ...categoriasReferencia
-      };
+  let datos = null;
+  try {
+    const r = await fetch('./precios-mag.json?t=' + Date.now(), { signal: AbortSignal.timeout(6000) });
+    if (r.ok) datos = await r.json();
+  } catch (e) { console.warn('[MAG] No se pudo leer precios-mag.json:', e.message); }
 
+  if (!datos || !datos.ok || !datos.categorias || !Object.keys(datos.categorias).length) {
+    console.warn('[MAG] precios-mag.json sin datos válidos todavía — usando valores de referencia. El robot automático los actualiza 2 veces por día.');
+    const idx = 180;
+    return {
+      fecha: new Date().toISOString().split('T')[0],
+      fuente: 'MAG (ref. local — el robot automático todavía no trajo datos reales)',
+      fuente_parcial: null,
+      indice_arr_fuente: 'ref. local',
+      categorias_full: { ...fallbackCategorias, ...categoriasReferencia },
+      categorias: Object.fromEntries(Object.entries(fallbackCategorias).map(([k,v]) => [k, v.prom])),
+      dolar_oficial: 1055, dolar_blue: 1260,
+      indice_arrendamiento_novillo_kg_ha: idx,
+      equivalente_arr_pesos_ha: Math.round(idx * 4200)
+    };
+  }
+
+  const categoriasFull = { ...categoriasReferencia, ...datos.categorias };
   const flatCats = {};
   Object.entries(categoriasFull).forEach(([cat, v]) => { flatCats[cat] = v.prom; });
-
-  const idxVal = (indiceData && indiceData.valor) ? indiceData.valor : 180;
+  const idxVal = datos.indice_arrendamiento_novillo_kg_ha || 180;
   const novProm = categoriasFull['Novillo']?.prom || 4200;
 
-  console.log(catData.ok
-    ? '[MAG categorías] Scraping OK — fecha ' + catData.fecha + ' — categorías reales: ' + Object.keys(catData.categorias).join(', ')
-    : '[MAG categorías] Scraping FALLÓ — usando valores de referencia fijos (revisar consola por errores de red/proxy)');
+  console.log('[MAG] precios-mag.json OK — fecha mercado: ' + datos.fecha_mercado + ' — scrapeado: ' + datos.fecha_scrape + ' — categorías: ' + Object.keys(datos.categorias).join(', '));
 
   return {
-    fecha: catData.fecha || new Date().toISOString().split('T')[0],
-    fuente: catData.ok ? 'MAG / Mercado de Liniers (elrural.com, scraping en vivo)' : 'MAG (ref. local — scraping no disponible)',
-    fuente_parcial: catData.ok ? 'Ternero y categorías de invernada: valor de referencia, no scrapeado' : null,
-    indice_arr_fuente: (indiceData && indiceData.fuente) ? indiceData.fuente : 'ref. local',
+    fecha: datos.fecha_mercado || datos.fecha_scrape?.split('T')[0] || new Date().toISOString().split('T')[0],
+    fuente: datos.fuente || 'MAG / Mercado de Liniers (robot automático)',
+    fuente_parcial: 'Ternero y categorías de invernada: valor de referencia, no scrapeado',
+    indice_arr_fuente: datos.indice_arrendamiento_novillo_kg_ha ? 'MAG / elrural.com (robot automático)' : 'ref. local',
     categorias_full: categoriasFull,
     categorias: flatCats,
     dolar_oficial: 1055, dolar_blue: 1260, // se sobrescriben siempre con datos reales en fetchPrices()

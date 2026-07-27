@@ -1,0 +1,15 @@
+{
+  "fecha_scrape": null,
+  "fecha_mercado": null,
+  "fuente": "MAG / Mercado de Liniers (elrural.com, scraping automático diario) - todavía no corrió por primera vez",
+  "categorias": {
+    "Novillo": { "min": 3900, "max": 4550, "prom": 4225 },
+    "Novillito": { "min": 4000, "max": 4700, "prom": 4350 },
+    "Vaquillona": { "min": 3800, "max": 4400, "prom": 4100 },
+    "Vaca Invernada": { "min": 3600, "max": 4300, "prom": 3950 },
+    "Vaca Manufactura": { "min": 3200, "max": 3800, "prom": 3500 },
+    "Toro": { "min": 3500, "max": 4100, "prom": 3800 }
+  },
+  "indice_arrendamiento_novillo_kg_ha": 180,
+  "ok": false
+}
