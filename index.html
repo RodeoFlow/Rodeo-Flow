@@ -4182,49 +4182,61 @@ async function fetchPrices() {
   toast('Precios MAG + BNA actualizados ✅' + blueLabel, 'ok');
 }
 
+// ── Helper: trae HTML de una URL probando varios proxies CORS en cadena ──
+// (allorigins puede estar lento/caído; si falla, probamos con codetabs y corsproxy.io)
+async function fetchHTMLConProxy(url, timeoutMs = 15000) {
+  const intentos = [
+    { nombre: 'allorigins', build: u => 'https://api.allorigins.win/get?url=' + encodeURIComponent(u), parse: async r => (await r.json()).contents || '' },
+    { nombre: 'codetabs', build: u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u), parse: async r => await r.text() },
+    { nombre: 'corsproxy.io', build: u => 'https://corsproxy.io/?url=' + encodeURIComponent(u), parse: async r => await r.text() }
+  ];
+  for (const intento of intentos) {
+    try {
+      const r = await fetch(intento.build(url), { signal: AbortSignal.timeout(timeoutMs) });
+      if (!r.ok) continue;
+      const html = await intento.parse(r);
+      if (html && html.length > 500) {
+        console.log('[Proxy] ' + intento.nombre + ' OK para ' + url);
+        return html;
+      }
+    } catch (e) { console.warn('[Proxy] ' + intento.nombre + ' falló:', e.message); }
+  }
+  throw new Error('Todos los proxies CORS fallaron para ' + url);
+}
+
 // ── Índice Novillo Arrendamiento Semanal desde elrural.com ──────────────────
 async function fetchIndiceArrendamientoElRural() {
-  // Estrategia 1: elrural.com vía allorigins (evita CORS)
+  // Estrategia 1: elrural.com (con proxies en cadena)
   const urlElRural = 'https://www.elrural.com/mercados/ganadero/precios-indicativos/indice-novillo-arrendamiento-precios-indicativos/';
   try {
-    const proxy = 'https://api.allorigins.win/get?url=' + encodeURIComponent(urlElRural);
-    const r = await fetch(proxy, {signal: AbortSignal.timeout(8000)});
-    if (r.ok) {
-      const data = await r.json();
-      const html = data.contents || '';
-      // Buscar el valor del índice semanal en la tabla de elrural
-      const match = html.match(/Novillo\s+Arren\.?\s*Semanal[^<]{0,200}?(\d[\d.,]{3,8})/i)
-                 || html.match(/arrendamiento[^<]{0,120}?(\d{3,4}[.,]\d{1,3})/i);
-      if (match) {
-        // Normalizar: "4.289,372" → 4289.372  |  "4289,37" → 4289.37
-        let raw = match[1].replace(/\./g,'').replace(',','.');
-        const val = parseFloat(raw);
-        if (val > 1000 && val < 20000) {
-          console.log('[ElRural] Índice arrendamiento semanal:', val);
-          return { valor: val, fuente: 'elrural.com (semanal)' };
-        }
+    const html = await fetchHTMLConProxy(urlElRural);
+    // Buscar el valor del índice semanal en la tabla de elrural
+    const match = html.match(/Novillo\s+Arren\.?\s*Semanal[^<]{0,200}?(\d[\d.,]{3,8})/i)
+               || html.match(/arrendamiento[^<]{0,120}?(\d{3,4}[.,]\d{1,3})/i);
+    if (match) {
+      // Normalizar: "4.289,372" → 4289.372  |  "4289,37" → 4289.37
+      let raw = match[1].replace(/\./g,'').replace(',','.');
+      const val = parseFloat(raw);
+      if (val > 1000 && val < 20000) {
+        console.log('[ElRural] Índice arrendamiento semanal:', val);
+        return { valor: val, fuente: 'elrural.com (semanal)' };
       }
     }
-  } catch(e) { console.warn('[ElRural] allorigins falló:', e.message); }
+  } catch(e) { console.warn('[ElRural] scraping falló:', e.message); }
 
   // Estrategia 2: MAG directo - INML semanal
   try {
     const urlMAG = 'https://www.mercadoagroganadero.com.ar/dll/hacienda2.dll/haciinfo000015';
-    const proxy2 = 'https://api.allorigins.win/get?url=' + encodeURIComponent(urlMAG);
-    const r2 = await fetch(proxy2, {signal: AbortSignal.timeout(8000)});
-    if (r2.ok) {
-      const data2 = await r2.json();
-      const html2 = data2.contents || '';
-      // La tabla MAG: buscar el valor numérico del índice
-      const m2 = html2.match(/[Íi]ndice\s+Arrendamiento[^<]{0,60}?(\d[\d.]{2,4}[,]\d{1,3})/i)
-              || html2.match(/<td[^>]*>\s*(\d[\d.]{2,4}[,]\d{1,3})\s*<\/td>/i);
-      if (m2) {
-        let raw2 = m2[1].replace(/\./g,'').replace(',','.');
-        const val2 = parseFloat(raw2);
-        if (val2 > 1000 && val2 < 20000) {
-          console.log('[MAG directo] Índice arrendamiento:', val2);
-          return { valor: val2, fuente: 'MAG (INML semanal)' };
-        }
+    const html2 = await fetchHTMLConProxy(urlMAG);
+    // La tabla MAG: buscar el valor numérico del índice
+    const m2 = html2.match(/[Íi]ndice\s+Arrendamiento[^<]{0,60}?(\d[\d.]{2,4}[,]\d{1,3})/i)
+            || html2.match(/<td[^>]*>\s*(\d[\d.]{2,4}[,]\d{1,3})\s*<\/td>/i);
+    if (m2) {
+      let raw2 = m2[1].replace(/\./g,'').replace(',','.');
+      const val2 = parseFloat(raw2);
+      if (val2 > 1000 && val2 < 20000) {
+        console.log('[MAG directo] Índice arrendamiento:', val2);
+        return { valor: val2, fuente: 'MAG (INML semanal)' };
       }
     }
   } catch(e) { console.warn('[MAG] Falló scraping directo:', e.message); }
@@ -4246,10 +4258,7 @@ async function fetchMAGCategoriasReal() {
     return { min, max, prom: Math.round((min + max) / 2) };
   }
   async function fetchHTML(url) {
-    const r = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(url), { signal: AbortSignal.timeout(9000) });
-    if (!r.ok) throw new Error('proxy no ok');
-    const d = await r.json();
-    return d.contents || '';
+    return await fetchHTMLConProxy(url);
   }
 
   const resultado = { categorias: {}, fecha: null, ok: false };
