@@ -22,6 +22,8 @@ function limpiarNumero(str) {
 }
 
 function extraerMinMax(texto, etiqueta) {
+  // Busca la etiqueta y los dos números que la siguen en el texto ya renderizado
+  // (sin tags HTML de por medio, porque viene de innerText del navegador real).
   const rx = new RegExp(
     etiqueta.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
     '[^\\d]{0,60}([\\d]{1,5}[.,]\\d{2})[^\\d]{0,40}([\\d]{1,5}[.,]\\d{2})',
@@ -37,6 +39,7 @@ function extraerMinMax(texto, etiqueta) {
 
 async function getTextoRenderizado(page, url) {
   await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+  // Espera un toque extra por si la tabla se llena con un fetch/AJAX propio
   await new Promise(res => setTimeout(res, 2500));
   return await page.evaluate(() => document.body.innerText);
 }
@@ -58,8 +61,13 @@ async function main() {
     ok: false
   };
 
+  // ── Categorías: Novillo (3 franjas de peso) ──
   try {
     const texto1 = await getTextoRenderizado(page, 'https://www.elrural.com/mercados/ganadero/mercado-de-liniers/liniers-precios-1/');
+    console.log('[scrape][diag] liniers-precios-1: ' + texto1.length + ' caracteres | contiene "Novillos": ' + texto1.includes('Novillos') + ' | contiene "431": ' + texto1.includes('431'));
+    if (!texto1.includes('Novillos')) {
+      console.log('[scrape][diag] Primeros 1500 caracteres del texto renderizado:\n' + texto1.slice(0, 1500));
+    }
     const fechaM = texto1.match(/(\d{2}\/\d{2}\/\d{2,4})/);
     if (fechaM) resultado.fecha_mercado = fechaM[1];
 
@@ -70,11 +78,15 @@ async function main() {
       const max = Math.max(...brackets.map(b => b.max));
       resultado.categorias['Novillo'] = { min, max, prom: Math.round((min + max) / 2) };
       resultado.ok = true;
+    } else if (texto1.includes('431')) {
+      const idx = texto1.indexOf('431');
+      console.log('[scrape][diag] "431" aparece pero no se extrajo min/max. Contexto: ' + texto1.slice(Math.max(0, idx - 60), idx + 200));
     }
   } catch (e) {
     console.warn('[scrape] liniers-precios-1 falló:', e.message);
   }
 
+  // ── Categorías: Novillito, Vaquillona, Vaca, Toro ──
   try {
     const texto2 = await getTextoRenderizado(page, 'https://www.elrural.com/mercados/ganadero/mercado-de-liniers/liniers-precios-2/');
     const map2 = {
@@ -92,6 +104,7 @@ async function main() {
     console.warn('[scrape] liniers-precios-2 falló:', e.message);
   }
 
+  // ── Índice de arrendamiento ──
   try {
     const texto3 = await getTextoRenderizado(page, 'https://www.elrural.com/mercados/ganadero/precios-indicativos/indice-novillo-arrendamiento-precios-indicativos/');
     const m = texto3.match(/Novillo\s+Arren\.?\s*Semanal[^\d]{0,60}(\d[\d.,]{2,8})/i)
@@ -106,6 +119,8 @@ async function main() {
 
   await browser.close();
 
+  // Si no se consiguió nada útil, no pisamos el archivo anterior (mejor un dato
+  // viejo pero real, que borrar todo por una falla puntual del sitio de origen).
   if (!resultado.ok) {
     console.warn('[scrape] No se consiguió ningún precio real esta vez. Se mantiene el archivo anterior.');
     if (fs.existsSync(OUT_PATH)) {
