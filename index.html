@@ -4265,6 +4265,7 @@ async function fetchMAGCategoriasReal() {
   const resultado = { categorias: {}, fecha: null, ok: false };
   try {
     const html1 = await fetchHTML('https://www.elrural.com/mercados/ganadero/mercado-de-liniers/liniers-precios-1/');
+    console.log('[MAG diag] liniers-precios-1: ' + html1.length + ' caracteres | contiene "Novillos": ' + html1.includes('Novillos') + ' | contiene "431": ' + html1.includes('431'));
     const fechaM = html1.match(/(\d{2}\/\d{2}\/\d{2})/);
     if (fechaM) resultado.fecha = fechaM[1];
 
@@ -4279,6 +4280,7 @@ async function fetchMAGCategoriasReal() {
     }
 
     const html2 = await fetchHTML('https://www.elrural.com/mercados/ganadero/mercado-de-liniers/liniers-precios-2/');
+    console.log('[MAG diag] liniers-precios-2: ' + html2.length + ' caracteres | contiene "Novillitos": ' + html2.includes('Novillitos') + ' | contiene "VAQ": ' + html2.includes('VAQ'));
     const map2 = {
       'Novillito': 'Novillitos Reg/esp',
       'Vaquillona': 'VAQ. REG/ESP',
