@@ -4196,10 +4196,11 @@ async function fetchHTMLConProxy(url, timeoutMs = 15000) {
       const r = await fetch(intento.build(url), { signal: AbortSignal.timeout(timeoutMs) });
       if (!r.ok) continue;
       const html = await intento.parse(r);
-      if (html && html.length > 500) {
-        console.log('[Proxy] ' + intento.nombre + ' OK para ' + url);
+      if (html && html.length > 5000) {
+        console.log('[Proxy] ' + intento.nombre + ' OK para ' + url + ' (' + html.length + ' caracteres)');
         return html;
       }
+      console.warn('[Proxy] ' + intento.nombre + ' respondió pero con contenido muy corto (' + (html ? html.length : 0) + ' caracteres), se descarta');
     } catch (e) { console.warn('[Proxy] ' + intento.nombre + ' falló:', e.message); }
   }
   throw new Error('Todos los proxies CORS fallaron para ' + url);
@@ -4250,7 +4251,7 @@ async function fetchMAGCategoriasReal() {
   const escapeRx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // Extrae [min, max] buscando la etiqueta de categoría y los dos números que la siguen en la fila de la tabla
   function extraerMinMax(html, etiqueta) {
-    const rx = new RegExp(escapeRx(etiqueta) + '[\\s\\S]{1,120}?([\\d]{2,5}[.,]\\d{2})[\\s\\S]{1,60}?([\\d]{2,5}[.,]\\d{2})', 'i');
+    const rx = new RegExp(escapeRx(etiqueta) + '[\\s\\S]{1,600}?([\\d]{2,5}[.,]\\d{2})[\\s\\S]{1,200}?([\\d]{2,5}[.,]\\d{2})', 'i');
     const m = html.match(rx);
     if (!m) return null;
     const min = parseFloat(m[1].replace(/\./g, '').replace(',', '.'));
@@ -4277,6 +4278,9 @@ async function fetchMAGCategoriasReal() {
       const max = Math.max(...brackets.map(b => b.max));
       resultado.categorias['Novillo'] = { min, max, prom: Math.round((min + max) / 2) };
       resultado.ok = true;
+    } else if (html1.includes('431')) {
+      const idx = html1.indexOf('431');
+      console.warn('[MAG diag] "431" aparece pero no se pudo extraer min/max. Contexto: ' + html1.slice(Math.max(0,idx-40), idx+250));
     }
 
     const html2 = await fetchHTML('https://www.elrural.com/mercados/ganadero/mercado-de-liniers/liniers-precios-2/');
