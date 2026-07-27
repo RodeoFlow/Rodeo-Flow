@@ -4186,8 +4186,9 @@ async function fetchPrices() {
 // (allorigins puede estar lento/caído; si falla, probamos con codetabs y corsproxy.io)
 async function fetchHTMLConProxy(url, timeoutMs = 15000) {
   const intentos = [
-    { nombre: 'allorigins', build: u => 'https://api.allorigins.win/get?url=' + encodeURIComponent(u), parse: async r => (await r.json()).contents || '' },
+    { nombre: 'r.jina.ai', build: u => 'https://r.jina.ai/' + u, parse: async r => await r.text() },
     { nombre: 'codetabs', build: u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u), parse: async r => await r.text() },
+    { nombre: 'allorigins', build: u => 'https://api.allorigins.win/get?url=' + encodeURIComponent(u), parse: async r => (await r.json()).contents || '' },
     { nombre: 'corsproxy.io', build: u => 'https://corsproxy.io/?url=' + encodeURIComponent(u), parse: async r => await r.text() }
   ];
   for (const intento of intentos) {
