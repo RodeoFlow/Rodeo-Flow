@@ -1,3 +1,5 @@
+
+
 {
   "fecha_scrape": null,
   "fecha_mercado": null,
@@ -635,29 +637,29 @@
     <div class="trial-sub">Prueba gratuita 30 días</div>
 
     <div style="text-align:left;font-size:13px;color:var(--accent);font-weight:700;margin:12px 0 4px">👤 Tus datos</div>
-    <label>Nombre y apellido</label>
+    <label>Nombre y apellido *</label>
     <input id="setup-nombre" type="text" placeholder="Ej: Juan Pérez">
-    <label>Email</label>
+    <label>Email *</label>
     <input id="setup-email" type="email" placeholder="juan@ejemplo.com">
     <div style="display:flex;gap:8px">
       <div style="flex:1">
-        <label>DNI</label>
+        <label>DNI *</label>
         <input id="setup-dni" type="text" placeholder="12.345.678" inputmode="numeric">
       </div>
       <div style="flex:1">
-        <label>CUIT</label>
+        <label>CUIT *</label>
         <input id="setup-cuit" type="text" placeholder="20-12345678-9" inputmode="numeric">
       </div>
     </div>
-    <label>Empresa / Razón social</label>
-    <input id="setup-empresa" type="text" placeholder="Ej: Agropecuaria Pérez S.A. (opcional)">
+    <label>Empresa / Razón social *</label>
+    <input id="setup-empresa" type="text" placeholder="Ej: Agropecuaria Pérez S.A.">
     <div style="display:flex;gap:8px">
       <div style="flex:1">
-        <label>Localidad</label>
+        <label>Localidad *</label>
         <input id="setup-localidad" type="text" placeholder="Ej: San Carlos de Bolívar">
       </div>
       <div style="flex:1">
-        <label>Provincia</label>
+        <label>Provincia *</label>
         <select id="setup-provincia">
           <option value="">-- Elegir --</option>
           <option>Buenos Aires</option><option>CABA</option><option>Catamarca</option>
@@ -673,7 +675,7 @@
     </div>
 
     <div style="text-align:left;font-size:13px;color:var(--accent);font-weight:700;margin:16px 0 4px">🏡 Tu establecimiento</div>
-    <label>Nombre del establecimiento</label>
+    <label>Nombre del establecimiento *</label>
     <input id="setup-estab" type="text" placeholder="Ej: Estancia La Pampa">
     <label>Teléfono Titular (obligatorio)</label>
     <input id="setup-tel1" type="tel" placeholder="+54 9 11 xxxx-xxxx">
@@ -3177,21 +3179,40 @@ let rfidInterval = null, rfidActive = false;
 const TRIAL_DAYS = 30;
 
 function startTrial() {
-  const t1 = document.getElementById('setup-tel1').value.trim();
-  if(!t1) { alert('Ingresá al menos el teléfono titular'); return; }
-  const estab = document.getElementById('setup-estab').value.trim();
+  const nombre    = document.getElementById('setup-nombre').value.trim();
+  const email     = document.getElementById('setup-email').value.trim();
+  const dni       = document.getElementById('setup-dni').value.trim();
+  const cuit      = document.getElementById('setup-cuit').value.trim();
+  const empresa   = document.getElementById('setup-empresa').value.trim();
+  const localidad = document.getElementById('setup-localidad').value.trim();
+  const provincia = document.getElementById('setup-provincia').value;
+  const estab     = document.getElementById('setup-estab').value.trim();
+  const t1        = document.getElementById('setup-tel1').value.trim();
+
+  // Todos estos campos son obligatorios para arrancar la prueba (queda un registro
+  // completo de quién ingresó). Los teléfonos de operario/administrador/veterinario
+  // siguen siendo opcionales.
+  const faltantes = [];
+  if(!nombre)    faltantes.push('Nombre y apellido');
+  if(!email)     faltantes.push('Email');
+  if(!dni)       faltantes.push('DNI');
+  if(!cuit)      faltantes.push('CUIT');
+  if(!empresa)   faltantes.push('Empresa / Razón social');
+  if(!localidad) faltantes.push('Localidad');
+  if(!provincia) faltantes.push('Provincia');
+  if(!estab)     faltantes.push('Nombre del establecimiento');
+  if(!t1)        faltantes.push('Teléfono Titular');
+
+  if(faltantes.length){
+    alert('Completá estos datos antes de iniciar la prueba:\n\n' + faltantes.join('\n'));
+    return;
+  }
 
   // Datos del usuario (planilla de registro inicial)
   const registro = {
-    nombre:    document.getElementById('setup-nombre').value.trim(),
-    email:     document.getElementById('setup-email').value.trim(),
-    dni:       document.getElementById('setup-dni').value.trim(),
-    cuit:      document.getElementById('setup-cuit').value.trim(),
-    empresa:   document.getElementById('setup-empresa').value.trim(),
-    localidad: document.getElementById('setup-localidad').value.trim(),
-    provincia: document.getElementById('setup-provincia').value,
+    nombre, email, dni, cuit, empresa, localidad, provincia,
     telefono:  t1,
-    establecimiento: estab || 'Mi Establecimiento',
+    establecimiento: estab,
     fecha:     new Date().toISOString()
   };
   DB.settings.registroUsuario = registro;
@@ -10088,5 +10109,3 @@ async function startBackupSystem() {
 
 </body>
 </html>
-
-
