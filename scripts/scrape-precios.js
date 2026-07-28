@@ -44,7 +44,7 @@ function mapearCategoria(nombreCrudo) {
 function parsearTablaCategorias(texto) {
   const categorias = {};
   const lineas = texto.split('\n').map(l => l.trim()).filter(Boolean);
-  const rxFila = /^([A-Za-zÀ-ÿ0-9./\- ]{3,40}?)\s+([\d]{1,3}(?:\.\d{3})*(?:,\d{1,2})?)\s+([\d]{1,3}(?:\.\d{3})*(?:,\d{1,2})?)\s+([\d]{1,3}(?:\.\d{3})*(?:,\d{1,2})?)/;
+  const rxFila = /^([A-Za-zÀ-ÿ0-9./\- ]{3,40}?)\s+([\d]+(?:\.\d{3})*(?:,\d+)?)\s+([\d]+(?:\.\d{3})*(?:,\d+)?)\s+([\d]+(?:\.\d{3})*(?:,\d+)?)/;
   for (const linea of lineas) {
     const m = linea.match(rxFila);
     if (!m) continue;
@@ -96,7 +96,7 @@ async function main() {
     const texto = await getTextoRenderizado(page, url);
     console.log('[scrape][diag] categorías: ' + texto.length + ' caracteres | contiene "PRECIOS POR CATEGORIA": ' + texto.toUpperCase().includes('PRECIOS POR CATEGORIA'));
 
-    const fechaM = texto.match(/(\d{2}\/\d{2}\/\d{4})\s+AL\s+(\d{2}\/\d{2}\/\d{4})/i);
+    const fechaM = texto.match(/(\d{2}\/\d{2}\/\d{4})\s+AL\s+[^\d]*(\d{2}\/\d{2}\/\d{4})/i);
     if (fechaM) resultado.fecha_mercado = fechaM[2];
 
     const categorias = parsearTablaCategorias(texto);
@@ -115,10 +115,9 @@ async function main() {
   try {
     const url2 = 'https://www.mercadoagroganadero.com.ar/dll/hacienda2.dll/haciinfo000013';
     const texto2 = await getTextoRenderizado(page, url2);
-    const m = texto2.match(/([\d]{1,3}(?:\.\d{3})*(?:,\d{1,3})?)\s*(?:kg|Kg)?\s*\/?\s*ha/i)
-           || texto2.match(/[Íi]ndice[^\d]{0,80}([\d]{1,3}(?:\.\d{3})*,\d{1,3})/i);
+    const m = texto2.match(/Totales\s+([\d.]+)\s+([\d.,]+)\s+([\d.,]+)/i);
     if (m) {
-      const val = limpiarNumero(m[1]);
+      const val = limpiarNumero(m[3]);
       if (val && val > 500 && val < 30000) resultado.indice_arrendamiento_novillo_kg_ha = val;
     } else {
       console.log('[scrape][diag] índice arrendamiento: no se encontró patrón. Primeros 800 caracteres:\n' + texto2.slice(0, 800));
