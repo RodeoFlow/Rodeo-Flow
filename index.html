@@ -3248,11 +3248,16 @@ async function checkAuth() {
   await loadFromStorageAsync();
   console.log('📦 checkAuth IDB - animales:', DB.animales?.length, '| potreros:', DB.potreros?.length);
 
+  // ── Si todavía no completó la planilla de registro, mostrarla y NO seguir ──
+  // (antes esto no se chequeaba nunca y la app arrancaba la prueba sola, sin pedir datos)
+  if(!DB.settings.hasBeenSetup){
+    document.getElementById('trial-screen').style.display = 'flex';
+    return false;
+  }
+
   DB.settings.establecimiento = DB.settings.establecimiento || 'Mi Establecimiento';
   DB.settings.phones = DB.settings.phones || [{num:'',name:'Titular'},{num:'',name:'Operario'},{num:'',name:'Administrador'},{num:'',name:'Veterinario'}];
 
-  // Si nunca se inició el trial, arrancarlo ahora
-  if(!DB.settings.trialStart) DB.settings.trialStart = Date.now();
   if(!DB.settings.schemaVersion) DB.settings.schemaVersion = DB_SCHEMA_VERSION;
   saveToStorage();
 
@@ -4293,7 +4298,9 @@ function updateBNADisplay(bna) {
   s('precios-usd-blue','$'+(DB.precios?.dolar_blue||'--'));
   const brecha = bna.venta ? (((DB.precios?.dolar_blue||bna.venta)/bna.venta-1)*100).toFixed(1)+'%' : '--';
   s('precios-brecha', brecha);
-  s('mag-fecha-label','MAG: '+(DB.precios?.fecha||'--')+' · BNA: '+bna.fecha+(DB.precios?.fuente_parcial?' · ⚠ '+DB.precios.fuente_parcial:''));
+  s('mag-fecha-label','MAG: '+(DB.precios?.fecha||'--')+' · BNA: '+bna.fecha);
+  const magLabelEl = document.getElementById('mag-fecha-label');
+  if (magLabelEl) magLabelEl.title = DB.precios?.fuente_parcial || '';
 }
 
 function updateMAGTable(p) {
