@@ -697,7 +697,7 @@
     <div style="font-size:36px;margin-bottom:8px">⛔</div>
     <h2>Período de prueba finalizado</h2>
     <p>Tu prueba gratuita de 30 días ha expirado. Activá tu suscripción para continuar usando RodeoFlow.</p>
-    <div class="paywall-price">USD 20 <span>/ mes</span></div>
+    <div class="paywall-price">USD 30 <span>/ mes</span></div>
     <p style="font-size:14px;color:var(--text3);margin-bottom:8px">≈ ARS <span id="paywall-ars-equiv">calculando...</span> al dólar oficial BNA</p>
     <p style="font-size:14px;color:var(--text3);margin-bottom:20px">Acceso completo · Sin límites · Soporte incluido</p>
     <button class="btn-pay" onclick="mostrarDatosPago()">💳 Ver datos de transferencia</button>
@@ -3383,7 +3383,7 @@ function openMercadoPago() { mostrarDatosPago(); } // compatibilidad
 function openNaranja()     { mostrarDatosPago(); } // compatibilidad
 
 function mostrarDatosPago() {
-  const msg = `💰 SUSCRIPCIÓN RODEOFLOW\n\nPrecio: USD 20 / mes\n\nTransferí por:\n• Alias: ${CVU_ALIAS}\n• Banco / Billetera: cualquiera (CVU universal)\n\nUna vez transferido enviá el comprobante por WhatsApp para recibir tu código de activación.`;
+  const msg = `💰 SUSCRIPCIÓN RODEOFLOW\n\nPrecio: USD 30 / mes\n\nTransferí por:\n• Alias: ${CVU_ALIAS}\n• Banco / Billetera: cualquiera (CVU universal)\n\nUna vez transferido enviá el comprobante por WhatsApp para recibir tu código de activación.`;
   if(confirm(msg + '\n\n¿Abrir WhatsApp para enviar comprobante?')) {
     window.open('https://wa.me/' + WHATSAPP_PAGO + '?text=' + encodeURIComponent('Hola, realicé el pago de RodeoFlow. Adjunto comprobante.'), '_blank');
   }
@@ -4350,7 +4350,7 @@ function updateMAGTable(p) {
 
 function updatePaywallARS(usdVenta) {
   const el = document.getElementById('paywall-ars-equiv');
-  if(el && usdVenta) el.textContent = '$'+Number(45*usdVenta).toLocaleString('es-AR');
+  if(el && usdVenta) el.textContent = '$'+Number(30*usdVenta).toLocaleString('es-AR');
 }
 
 
