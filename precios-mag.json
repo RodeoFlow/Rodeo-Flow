@@ -1,12 +1,12 @@
 {
-  "fecha_scrape": "2026-07-29T14:17:01.368Z",
+  "fecha_scrape": "2026-07-29T18:52:57.607Z",
   "fecha_mercado": "29/07/2026",
   "fuente": "MAG - Mercado Agroganadero (mercadoagroganadero.com.ar, scraping automático diario)",
   "categorias": {
     "Novillo": {
-      "min": 3500,
+      "min": 3550,
       "max": 4800,
-      "prom": 4150
+      "prom": 4175
     },
     "Novillito": {
       "min": 2600,
@@ -34,6 +34,6 @@
       "prom": 2900
     }
   },
-  "indice_arrendamiento_novillo_kg_ha": 4403.969,
+  "indice_arrendamiento_novillo_kg_ha": 4404.428,
   "ok": true
 }
