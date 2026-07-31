@@ -1,5 +1,5 @@
 {
-  "fecha_scrape": "2026-07-31T14:14:29.700Z",
+  "fecha_scrape": "2026-07-31T19:05:10.104Z",
   "fecha_mercado": "31/07/2026",
   "fuente": "MAG - Mercado Agroganadero (mercadoagroganadero.com.ar, scraping automático diario)",
   "categorias": {
@@ -29,11 +29,11 @@
       "prom": 3000
     },
     "Toro": {
-      "min": 390,
+      "min": 2770,
       "max": 4100,
-      "prom": 2245
+      "prom": 3435
     }
   },
-  "indice_arrendamiento_novillo_kg_ha": 4340.902,
+  "indice_arrendamiento_novillo_kg_ha": 4352.836,
   "ok": true
 }
