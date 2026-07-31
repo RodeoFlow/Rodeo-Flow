@@ -1,0 +1,40 @@
+name: Actualizar precios MAG
+
+on:
+  schedule:
+    - cron: '0 12 * * *'
+    - cron: '0 18 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repo
+        uses: actions/checkout@v4
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Correr el scraper
+        run: npm run scrape
+
+      - name: Guardar precios-mag.json si cambió
+        run: |
+          git config user.name "rodeoflow-bot"
+          git config user.email "actions@github.com"
+          git add precios-mag.json
+          git diff --staged --quiet || git commit -m "Actualización automática de precios MAG"
+          git push
+Bajá y tocá "Commit changes".
+
+¿Pudiste crear el archivo con esa ruta?
+
+Has usado 75% de tu límite semanal
+
+

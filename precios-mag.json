@@ -1,15 +1,16 @@
 {
-  "fecha_scrape": null,
-  "fecha_mercado": null,
-  "fuente": "MAG / Mercado de Liniers (elrural.com, scraping automático diario) - todavía no corrió por primera vez",
+  "fecha_scrape": "2026-07-29T18:52:57.607Z",
+  "fecha_mercado": "29/07/2026",
+  "fuente": "MAG - Mercado Agroganadero (mercadoagroganadero.com.ar, scraping automático diario)",
   "categorias": {
-    "Novillo": { "min": 3900, "max": 4550, "prom": 4225 },
-    "Novillito": { "min": 4000, "max": 4700, "prom": 4350 },
-    "Vaquillona": { "min": 3800, "max": 4400, "prom": 4100 },
-    "Vaca Invernada": { "min": 3600, "max": 4300, "prom": 3950 },
-    "Vaca Manufactura": { "min": 3200, "max": 3800, "prom": 3500 },
-    "Toro": { "min": 3500, "max": 4100, "prom": 3800 }
+    "Novillo": { "min": 3550, "max": 4800, "prom": 4175 },
+    "Novillito": { "min": 2600, "max": 5300, "prom": 3950 },
+    "Vaquillona": { "min": 2900, "max": 5300, "prom": 4100 },
+    "Vaca Invernada": { "min": 1900, "max": 4900, "prom": 3400 },
+    "Vaca Manufactura": { "min": 1700, "max": 2800, "prom": 2250 },
+    "Toro": { "min": 2000, "max": 3800, "prom": 2900 }
   },
-  "indice_arrendamiento_novillo_kg_ha": 180,
-  "ok": false
+  "indice_arrendamiento_novillo_kg_ha": 4404.428,
+  "ok": true,
+  "ultimo_intento_fallido": "2026-07-30T19:06:53.159Z"
 }

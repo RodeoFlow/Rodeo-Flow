@@ -93,17 +93,23 @@
     if (txt) txt.textContent = s.title;
   }
 
+
   // ── Colecciones económicas: no deben llegar a dispositivos logueados como no-Dueño ─
   const COLECCIONES_SOLO_DUENO = ['ventas','compras','clientes'];
 
+
+ 
   // ── Aplicar el cambio de UNA colección (no toda la base) ─
   function aplicarCambioColeccion(key, payload, esCargaInicial) {
     if (!payload || payload.data === undefined || payload.data === 'undefined') return;
     if (payload.deviceId === window._rfDeviceId) return; // eco de mi propio push
+ 
     if (COLECCIONES_SOLO_DUENO.includes(key)) {
       const rol = sessionStorage.getItem('rf_role');
       if (rol && rol !== 'Dueño') return; // este dispositivo no debe recibir datos económicos
     }
+
+ 
     if ((payload.updatedAt || 0) <= (_ultimoTsPorColeccion[key] || 0) && !esCargaInicial) return;
     try {
       const parsed = JSON.parse(payload.data);
@@ -203,7 +209,9 @@
 
   // ── Iniciar listener ─────────────────────────────────
   window.iniciarSync = async function(estabId) {
+
     await _authPromise; // esperar sesión de Firebase Auth antes de leer/escribir
+
     if (_refColecciones) { _refColecciones.off(); _refColecciones = null; }
     _cargaInicialLista = false;
     Object.keys(_ultimoJSONPorColeccion).forEach(k => delete _ultimoJSONPorColeccion[k]);
@@ -9056,6 +9064,7 @@ function actualizarEstadoConexion(){
   if (!badge) return;
   badge.style.display = navigator.onLine ? 'none' : 'inline-block';
 }
+
 // Doble toque de "atrás" para salir (evita salidas accidentales)
 (function(){
   let listoParaSalir = false;
@@ -9081,6 +9090,7 @@ function actualizarEstadoConexion(){
     }
   });
 })();
+
 
 window.addEventListener('online', () => { actualizarEstadoConexion(); toast('Conexión restablecida — sincronizando…', 'ok'); });
 window.addEventListener('offline', () => { actualizarEstadoConexion(); toast('Sin conexión — seguís trabajando local, se sincroniza al volver la señal', 'warn'); });
