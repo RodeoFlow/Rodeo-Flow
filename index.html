@@ -93,23 +93,17 @@
     if (txt) txt.textContent = s.title;
   }
 
-
   // ── Colecciones económicas: no deben llegar a dispositivos logueados como no-Dueño ─
   const COLECCIONES_SOLO_DUENO = ['ventas','compras','clientes'];
 
-
- 
   // ── Aplicar el cambio de UNA colección (no toda la base) ─
   function aplicarCambioColeccion(key, payload, esCargaInicial) {
     if (!payload || payload.data === undefined || payload.data === 'undefined') return;
     if (payload.deviceId === window._rfDeviceId) return; // eco de mi propio push
- 
     if (COLECCIONES_SOLO_DUENO.includes(key)) {
       const rol = sessionStorage.getItem('rf_role');
       if (rol && rol !== 'Dueño') return; // este dispositivo no debe recibir datos económicos
     }
-
- 
     if ((payload.updatedAt || 0) <= (_ultimoTsPorColeccion[key] || 0) && !esCargaInicial) return;
     try {
       const parsed = JSON.parse(payload.data);
@@ -209,9 +203,7 @@
 
   // ── Iniciar listener ─────────────────────────────────
   window.iniciarSync = async function(estabId) {
-
     await _authPromise; // esperar sesión de Firebase Auth antes de leer/escribir
-
     if (_refColecciones) { _refColecciones.off(); _refColecciones = null; }
     _cargaInicialLista = false;
     Object.keys(_ultimoJSONPorColeccion).forEach(k => delete _ultimoJSONPorColeccion[k]);
@@ -891,8 +883,8 @@
       </div>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Foto</th><th>RP</th><th>RFID</th><th>Categoría</th><th>Raza</th><th>Sexo</th><th>F.Nac</th><th>Peso</th><th>GDP</th><th>Potrero</th><th>Preñez</th><th>Estado</th><th>Acciones</th></tr></thead>
-          <tbody id="animales-tbody"><tr><td colspan="13" style="text-align:center;color:var(--text3);padding:20px">Sin animales</td></tr></tbody>
+          <thead><tr><th>Foto</th><th>RP</th><th>RFID</th><th>Categoría</th><th>Raza</th><th>Sexo</th><th>F.Nac</th><th>Peso</th><th>GDP</th><th>Potrero</th><th>Preñez</th><th>Estado</th><th>Obs</th><th>Acciones</th></tr></thead>
+          <tbody id="animales-tbody"><tr><td colspan="14" style="text-align:center;color:var(--text3);padding:20px">Sin animales</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -6757,8 +6749,24 @@ function renderAnimales(filtrados){
     <td>${a.potrero||'--'}</td>
     <td>${a.prenada&&a.prenada!=='No'?`<span class="badge badge-blue">${a.prenada}</span>`:'--'}</td>
     <td><span class="badge ${a.activo?'badge-green':'badge-red'}">${a.activo?'Activo':'Baja'}</span></td>
+    <td>${a.obs?`<button class="btn-secondary" style="padding:2px 8px;font-size:14px" onclick="verObsAnimal('${a.rp}')" title="Ver observaciones">📝</button>`:'--'}</td>
     <td><button class="btn-danger" style="padding:2px 10px;font-size:13px" onclick="bajaAnimal(${a.id})">🗑 Baja</button></td>
-  </tr>`).join('')||emptyRow(13);
+  </tr>`).join('')||emptyRow(14);
+}
+
+// ── Ver observaciones completas del animal en un popup ──
+function verObsAnimal(rp){
+  const a=DB.animales.find(x=>x.rp===rp);
+  if(!a||!a.obs){toast('Este animal no tiene observaciones cargadas','info');return;}
+  const win=document.createElement('div');
+  win.style.cssText='position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:24px';
+  win.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:20px;max-width:480px;width:100%;cursor:default" onclick="event.stopPropagation()">
+    <div style="color:var(--accent);font-weight:700;margin-bottom:10px">RP ${a.rp} · Observaciones</div>
+    <div style="color:var(--text);white-space:pre-wrap;line-height:1.5">${a.obs}</div>
+    <div style="color:var(--text3);font-size:12px;margin-top:16px;text-align:right">Tocá afuera para cerrar</div>
+  </div>`;
+  win.onclick=()=>win.remove();
+  document.body.appendChild(win);
 }
 
 // ── Ver foto del animal ampliada ──
@@ -9064,7 +9072,6 @@ function actualizarEstadoConexion(){
   if (!badge) return;
   badge.style.display = navigator.onLine ? 'none' : 'inline-block';
 }
-
 // Doble toque de "atrás" para salir (evita salidas accidentales)
 (function(){
   let listoParaSalir = false;
@@ -9090,7 +9097,6 @@ function actualizarEstadoConexion(){
     }
   });
 })();
-
 
 window.addEventListener('online', () => { actualizarEstadoConexion(); toast('Conexión restablecida — sincronizando…', 'ok'); });
 window.addEventListener('offline', () => { actualizarEstadoConexion(); toast('Sin conexión — seguís trabajando local, se sincroniza al volver la señal', 'warn'); });
