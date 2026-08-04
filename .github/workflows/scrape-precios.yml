@@ -2,18 +2,24 @@ name: Actualizar precios MAG
 
 on:
   schedule:
-    - cron: '0 12 * * *'
-    - cron: '0 18 * * *'
-  workflow_dispatch: {}
+    # Todos los horarios en UTC. Argentina = UTC-3 (sin horario de verano).
+    - cron: '*/15 13-17 * * 1-6'   # cada 15 min, 10:00 a 14:59 hs ARG (lun a sáb)
+    - cron: '0,15 18 * * 1-6'      # 15:00 y 15:15 hs ARG — cierre del día
+  workflow_dispatch: {}            # permite correrlo a mano desde la pestaña Actions
+
+# Necesario para que el job pueda hacer commit/push del precios-mag.json actualizado
+permissions:
+  contents: write
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Descargar el repo
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Instalar Node
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -21,13 +27,23 @@ jobs:
       - name: Instalar dependencias
         run: npm install
 
-      - name: Correr el scraper
+      - name: Correr scraper
+        id: scrape
         run: npm run scrape
+        continue-on-error: true   # capturamos el resultado igual para poder commitear el archivo de "intento fallido"
 
-      - name: Guardar precios-mag.json si cambió
+      - name: Commit y push si precios-mag.json cambió
         run: |
-          git config user.name "rodeoflow-bot"
-          git config user.email "actions@github.com"
-          git add precios-mag.json
-          git diff --staged --quiet || git commit -m "Actualización automática de precios MAG"
-          git push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- precios-mag.json; then
+            git add precios-mag.json
+            git commit -m "Actualizar precios MAG [automático]"
+            git push
+          else
+            echo "precios-mag.json sin cambios, no se commitea."
+          fi
+
+      - name: Marcar el job como fallido si el scrape falló
+        if: steps.scrape.outcome == 'failure'
+        run: exit 1
