@@ -137,7 +137,10 @@ async function main() {
     } else {
       fs.writeFileSync(OUT_PATH, JSON.stringify(resultado, null, 2));
     }
-    process.exit(0);
+    // Salir con código de error: así la corrida queda marcada en rojo ❌ en
+    // GitHub Actions cuando no se encontraron datos reales, en vez de mostrar
+    // un verde engañoso que hace parecer que todo funcionó bien.
+    process.exit(1);
   }
 
   fs.writeFileSync(OUT_PATH, JSON.stringify(resultado, null, 2));
