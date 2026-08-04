@@ -1,5 +1,5 @@
 {
-  "fecha_scrape": "2026-08-04T15:16:05.118Z",
+  "fecha_scrape": "2026-08-04T17:10:43.884Z",
   "fecha_mercado": "04/08/2026",
   "fuente": "MAG - Mercado Agroganadero (mercadoagroganadero.com.ar, scraping automático diario)",
   "categorias": {
@@ -20,8 +20,8 @@
     },
     "Vaca Invernada": {
       "min": 1700,
-      "max": 5550,
-      "prom": 3625
+      "max": 4100,
+      "prom": 2900
     },
     "Vaca Manufactura": {
       "min": 1700,
