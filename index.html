@@ -132,7 +132,7 @@
       try {
         if (window.runMigrations) window.DB = window.runMigrations(window.DB);
         window.saveEstabActivo?.();
-        window.init?.();
+        window.init?.(true); // true = viene de sync remoto, no re-fetchear precios
         setSyncStatus('ok');
         if (_cargaInicialLista) window.toast?.('Datos actualizados desde otro dispositivo 📡', 'ok');
       } finally {
@@ -3428,7 +3428,7 @@ async function checkActivation() {
 }
 
 // ─── INIT ───
-function init() {
+function init(desdeSync) {
   setCurrentDate();
   updateAllDropdowns();
   aplicarPermisosRol();
@@ -3455,9 +3455,11 @@ function init() {
   updateKPIs();
   renderConfigPhones();
   updateTrialStatus();
-  fetchPrices();
-  startAutoSave();
-  startBackupSystem();
+  if (!desdeSync) {
+    fetchPrices();
+    startAutoSave();
+    startBackupSystem();
+  }
   initBaston();
   renderSelectorEstab();
   // No cargar datos de muestra - app de producción
@@ -4130,7 +4132,7 @@ function addHistorial(tipo,desc,rp='',responsable='') {
 async function fetchBNADolar() {
   // Fuente 1: dolarapi.com — API pública confiable para dólar oficial BNA
   try {
-    const r = await fetch('https://dolarapi.com/v1/dolares/oficial');
+    const r = await fetch('https://dolarapi.com/v1/dolares/oficial', { signal: AbortSignal.timeout(5000) });
     if(r.ok) {
       const d = await r.json();
       if(d.compra && d.venta) {
@@ -4141,7 +4143,7 @@ async function fetchBNADolar() {
 
   // Fuente 2: otra API de dólar
   try {
-    const r = await fetch('https://api.bluelytics.com.ar/v2/latest');
+    const r = await fetch('https://api.bluelytics.com.ar/v2/latest', { signal: AbortSignal.timeout(5000) });
     if(r.ok) {
       const d = await r.json();
       const compra = d.oficial?.value_buy;
@@ -4154,7 +4156,7 @@ async function fetchBNADolar() {
 
   // Fuente 3: BNA vía proxy (fallback)
   try {
-    const r = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent('https://www.bna.com.ar/Personas'));
+    const r = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent('https://www.bna.com.ar/Personas'), { signal: AbortSignal.timeout(6000) });
     const data = await r.json();
     const html = data.contents || '';
     const matches = html.match(/U\.S\.dollar[\s\S]*?<td[^>]*>([\d,\.]+)<\/td>[\s\S]*?<td[^>]*>([\d,\.]+)<\/td>/i);
@@ -4174,7 +4176,7 @@ async function fetchBNADolar() {
 async function fetchBlueDolar() {
   // Fuente 1: dolarapi.com — dólar blue real en tiempo real
   try {
-    const r = await fetch('https://dolarapi.com/v1/dolares/blue');
+    const r = await fetch('https://dolarapi.com/v1/dolares/blue', { signal: AbortSignal.timeout(5000) });
     if(r.ok) {
       const d = await r.json();
       if(d.venta) return { compra: d.compra, venta: d.venta, fuente: 'dolarapi.com (Blue)', fecha: new Date().toLocaleDateString('es-AR') };
@@ -4182,7 +4184,7 @@ async function fetchBlueDolar() {
   } catch(e) {}
   // Fuente 2: bluelytics.com.ar
   try {
-    const r = await fetch('https://api.bluelytics.com.ar/v2/latest');
+    const r = await fetch('https://api.bluelytics.com.ar/v2/latest', { signal: AbortSignal.timeout(5000) });
     if(r.ok) {
       const d = await r.json();
       const compra = d.blue?.value_buy;
@@ -4192,7 +4194,7 @@ async function fetchBlueDolar() {
   } catch(e) {}
   // Fuente 3: argentinadatos.com
   try {
-    const r = await fetch('https://api.argentinadatos.com/v1/cotizaciones/dolares/blue');
+    const r = await fetch('https://api.argentinadatos.com/v1/cotizaciones/dolares/blue', { signal: AbortSignal.timeout(5000) });
     if(r.ok) {
       const d = await r.json();
       if(d.venta) return { compra: d.compra, venta: d.venta, fuente: 'ArgentinaDatos (Blue)', fecha: new Date().toLocaleDateString('es-AR') };
@@ -4210,8 +4212,27 @@ async function fetchPrices() {
   const [bnaData, blueData, magData] = await Promise.all([fetchBNADolar(), fetchBlueDolar(), fetchMAGPrices()]);
 
   const dolarBlue = blueData?.venta || magData.dolar_blue || 0;
-  // Guardamos el snapshot anterior de precios por categoría para poder comparar y mostrar la tendencia (▲/▼)
-  if(DB.precios?.categorias_full) DB.preciosAnteriores = { ...DB.precios.categorias_full };
+
+  // Historial de precios por fecha de mercado — así la tendencia compara
+  // contra el último remate DISTINTO, no contra el fetch anterior de hoy
+  // (que casi siempre trae el mismo dato y por eso mostraba "sin cambios" todo el día).
+  const normFecha = (f) => {
+    if (!f) return null;
+    if (/^\d{4}-\d{2}-\d{2}/.test(f)) return f.slice(0, 10);
+    const m = f.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
+  };
+  const fechaHoy = normFecha(magData.fecha) || new Date().toISOString().slice(0, 10);
+  if (!DB.preciosHistorial) DB.preciosHistorial = {};
+  if (magData.categorias_full) DB.preciosHistorial[fechaHoy] = { ...magData.categorias_full };
+  // Nos quedamos con los últimos 90 días de historial para no acumular datos de más
+  const fechasGuardadas = Object.keys(DB.preciosHistorial).sort();
+  if (fechasGuardadas.length > 90) {
+    fechasGuardadas.slice(0, fechasGuardadas.length - 90).forEach(f => delete DB.preciosHistorial[f]);
+  }
+  const fechaAnterior = fechasGuardadas.filter(f => f !== fechaHoy).sort().pop();
+  DB.preciosAnteriores = fechaAnterior ? { ...DB.preciosHistorial[fechaAnterior] } : null;
+
   DB.precios = { ...magData, dolar_bna_compra: bnaData.compra, dolar_bna_venta: bnaData.venta, dolar_oficial: bnaData.venta, dolar_blue: dolarBlue };
   DB.bna = bnaData;
   DB.blue = blueData;
@@ -10115,7 +10136,8 @@ async function startBackupSystem() {
     }
   } catch(e) {}
   // Después cada 24h
-  setInterval(() => guardarBackupEnIDB('auto'), BACKUP_INTERVAL_MS);
+  if (window._backupInterval) clearInterval(window._backupInterval);
+  window._backupInterval = setInterval(() => guardarBackupEnIDB('auto'), BACKUP_INTERVAL_MS);
 }
 
 </script>
