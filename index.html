@@ -3176,6 +3176,8 @@ window.DB = {
 };
 
 let rfidInterval = null, rfidActive = false;
+let lastRfidTs = 0, lastRfidRp = '';
+const RFID_PESO_CORRELACION_MS = 5000; // ventana máx entre lectura RFID y peso para autoguardar juntos
 
 // ─── TRIAL / AUTH SYSTEM ───
 const TRIAL_DAYS = 30;
@@ -9007,6 +9009,8 @@ function bastonOnRFID(rfid) {
   if (br) br.textContent = rfid;
   document.getElementById('baston-last-read').style.display = 'block';
   const animal = DB.animales.find(a => a.rfid && a.rfid.replace(/\s/g,'').toUpperCase() === rfid.replace(/\s/g,'').toUpperCase());
+  lastRfidTs = Date.now();
+  lastRfidRp = animal ? animal.rp : '';
   if (ba) ba.textContent = animal ? `RP ${animal.rp} · ${animal.categoria}` : 'Sin registro';
   if (lrd) lrd.innerHTML = `<span style="color:var(--green)">▶</span> RFID: <strong>${rfid}</strong>${animal?` · RP: <strong>${animal.rp}</strong> · <strong>${animal.categoria}</strong>`:' · <span style="color:var(--amber)">Sin registro</span>'}`;
   const box = document.getElementById('rfid-scanner-box');
@@ -9052,7 +9056,13 @@ function bastonOnPeso(peso) {
   }
   if (document.getElementById('baston-auto-save')?.checked) {
     const rp = document.getElementById('m-rp')?.value?.trim();
-    if (rp) setTimeout(() => guardarPesada(), 300);
+    const rfidReciente = (Date.now() - lastRfidTs) <= RFID_PESO_CORRELACION_MS;
+    const rpCoincide = rp && rp === lastRfidRp;
+    if (rp && rfidReciente && rpCoincide) {
+      setTimeout(() => guardarPesada(), 300);
+    } else if (rp) {
+      toast(`⚠️ Peso ${peso.toFixed(1)}kg sin RFID reciente confirmado para RP ${rp} — no se autoguardó`, 'warn');
+    }
   }
   toast(`⚖️ Peso: ${peso.toFixed(1)} kg`, 'ok');
 }
