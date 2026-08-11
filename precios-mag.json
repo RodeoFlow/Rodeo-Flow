@@ -1,5 +1,5 @@
 {
-  "fecha_scrape": "2026-08-11T14:12:55.695Z",
+  "fecha_scrape": "2026-08-11T15:15:52.959Z",
   "fecha_mercado": "11/08/2026",
   "fuente": "MAG - Mercado Agroganadero (mercadoagroganadero.com.ar, scraping automático diario)",
   "categorias": {
@@ -25,8 +25,8 @@
     },
     "Vaca Manufactura": {
       "min": 2100,
-      "max": 4200,
-      "prom": 3150
+      "max": 3000,
+      "prom": 2550
     },
     "Toro": {
       "min": 3300,
@@ -34,6 +34,6 @@
       "prom": 3950
     }
   },
-  "indice_arrendamiento_novillo_kg_ha": 4511.267,
+  "indice_arrendamiento_novillo_kg_ha": 4436.801,
   "ok": true
 }
