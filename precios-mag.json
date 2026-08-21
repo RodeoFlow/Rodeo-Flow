@@ -1,5 +1,5 @@
 {
-  "fecha_scrape": "2026-08-21T15:00:42.500Z",
+  "fecha_scrape": "2026-08-21T15:45:53.716Z",
   "fecha_mercado": "21/08/2026",
   "fuente": "MAG - Mercado Agroganadero (mercadoagroganadero.com.ar, scraping automático diario)",
   "categorias": {
@@ -34,6 +34,6 @@
       "prom": 3100
     }
   },
-  "indice_arrendamiento_novillo_kg_ha": 4374.907,
+  "indice_arrendamiento_novillo_kg_ha": 4372.88,
   "ok": true
 }
