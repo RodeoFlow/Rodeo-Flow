@@ -1,5 +1,5 @@
 {
-  "fecha_scrape": "2026-08-21T14:17:43.441Z",
+  "fecha_scrape": "2026-08-21T15:00:42.500Z",
   "fecha_mercado": "21/08/2026",
   "fuente": "MAG - Mercado Agroganadero (mercadoagroganadero.com.ar, scraping automático diario)",
   "categorias": {
@@ -19,9 +19,9 @@
       "prom": 3785
     },
     "Vaca Invernada": {
-      "min": 2200,
-      "max": 4000,
-      "prom": 3100
+      "min": 2000,
+      "max": 4220,
+      "prom": 3110
     },
     "Vaca Manufactura": {
       "min": 2100,
@@ -34,6 +34,6 @@
       "prom": 3100
     }
   },
-  "indice_arrendamiento_novillo_kg_ha": 4379.874,
+  "indice_arrendamiento_novillo_kg_ha": 4374.907,
   "ok": true
 }
