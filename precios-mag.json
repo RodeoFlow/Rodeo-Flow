@@ -1,5 +1,5 @@
 {
-  "fecha_scrape": "2026-08-21T13:37:27.802Z",
+  "fecha_scrape": "2026-08-21T14:17:43.441Z",
   "fecha_mercado": "21/08/2026",
   "fuente": "MAG - Mercado Agroganadero (mercadoagroganadero.com.ar, scraping automático diario)",
   "categorias": {
@@ -14,9 +14,9 @@
       "prom": 3850
     },
     "Vaquillona": {
-      "min": 2400,
+      "min": 2200,
       "max": 5370,
-      "prom": 3885
+      "prom": 3785
     },
     "Vaca Invernada": {
       "min": 2200,
@@ -30,10 +30,10 @@
     },
     "Toro": {
       "min": 2400,
-      "max": 3700,
-      "prom": 3050
+      "max": 3800,
+      "prom": 3100
     }
   },
-  "indice_arrendamiento_novillo_kg_ha": 4390.978,
+  "indice_arrendamiento_novillo_kg_ha": 4379.874,
   "ok": true
 }
