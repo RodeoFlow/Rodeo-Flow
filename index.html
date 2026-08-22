@@ -29,6 +29,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════
@@ -60,6 +61,7 @@
 
   // ── Estado ──────────────────────────────────────────
   let _refColecciones   = null;   // ref a establecimientos/<id>/collections
+  let _refSuscripcion   = null;   // ref a establecimientos/<id>/suscripcion (solo-lectura para el cliente)
   let _ultimoGuardado   = 0;      // throttle general de push
   let _ultimoLegacyPush = 0;      // throttle del blob completo (modo compatibilidad)
   let _aplicandoRemoto  = false;  // bloquea pushes mientras se aplica un cambio remoto
@@ -114,7 +116,20 @@
         return;
       }
       if (!window.DB) window.DB = {};
-      window.DB[key] = parsed;
+      if (key === 'settings') {
+        // Preservar el estado de suscripción local: el payload remoto de 'settings'
+        // ya no lo incluye (ver pushSyncFirebase). La fuente de verdad de subscribed/
+        // activationDate/activationCode es el nodo aparte 'suscripcion' (listener abajo).
+        const prev = window.DB.settings || {};
+        window.DB[key] = {
+          ...parsed,
+          subscribed:      prev.subscribed,
+          activationDate:  prev.activationDate,
+          activationCode:  prev.activationCode
+        };
+      } else {
+        window.DB[key] = parsed;
+      }
       _ultimoTsPorColeccion[key] = payload.updatedAt || Date.now();
       _ultimoJSONPorColeccion[key] = payload.data; // evita reenviarlo de vuelta
       window._ultimoSyncTs = Math.max(window._ultimoSyncTs, payload.updatedAt || 0);
@@ -157,7 +172,20 @@
 
     claves.forEach(key => {
       let json;
-      try { json = JSON.stringify(window.DB[key]); } catch(e) { return; }
+      try {
+        // 'settings' sigue sincronizando establecimiento/phones/trialStart normalmente,
+        // pero NUNCA el estado de suscripción: eso es de sólo-lectura para el cliente
+        // (lo escribe la Cloud Function validarCodigoActivacion en un nodo aparte,
+        // ver establecimientos/{estabId}/suscripcion). Si no se excluyera acá, alguien
+        // podría hacer DB.settings.subscribed=true desde la consola del navegador y
+        // ese valor se subiría a Firebase y se propagaría a todos los dispositivos.
+        if (key === 'settings') {
+          const { subscribed, activationDate, activationCode, ...resto } = window.DB[key] || {};
+          json = JSON.stringify(resto);
+        } else {
+          json = JSON.stringify(window.DB[key]);
+        }
+      } catch(e) { return; }
       if (json === undefined || json === _ultimoJSONPorColeccion[key]) return; // sin cambios → no se envía
       huboCambios = true;
       _ultimoJSONPorColeccion[key] = json;
@@ -213,6 +241,22 @@
 
     _refColecciones = rtdb.ref(`establecimientos/${estabId}/collections`);
 
+    // ── Estado de suscripción: nodo aparte, de sólo-lectura para el cliente.
+    //    Sólo lo escribe la Cloud Function validarCodigoActivacion (Admin SDK,
+    //    no pasa por las reglas). Las reglas de Firebase deben tener
+    //    ".write": false para este path — ver nota en checkActivation().
+    if (_refSuscripcion) { _refSuscripcion.off(); }
+    _refSuscripcion = rtdb.ref(`establecimientos/${estabId}/suscripcion`);
+    _refSuscripcion.on('value', snap => {
+      const s = snap.val();
+      if (!s || !window.DB || !window.DB.settings) return;
+      window.DB.settings.subscribed     = !!s.subscribed;
+      window.DB.settings.activationDate = s.activationDate || null;
+      window.DB.settings.activationCode = s.activationCode || null;
+      window.saveToStorage?.();
+      window.updateTrialStatus?.();
+    });
+
     // child_added trae automáticamente TODAS las colecciones existentes al conectar
     // (hidratación inicial), y también cualquier colección nueva que se agregue después.
     _refColecciones.on('child_added', snap => aplicarCambioColeccion(snap.key, snap.val(), true));
@@ -232,6 +276,7 @@
   // ── Detener sync ─────────────────────────────────────
   window.detenerSync = function() {
     if (_refColecciones) { _refColecciones.off(); _refColecciones = null; }
+    if (_refSuscripcion) { _refSuscripcion.off(); _refSuscripcion = null; }
     setSyncStatus('off');
   };
 
@@ -681,12 +726,16 @@
     <input id="setup-estab" type="text" placeholder="Ej: Estancia La Pampa">
     <label>Teléfono Titular (obligatorio)</label>
     <input id="setup-tel1" type="tel" placeholder="+54 9 11 xxxx-xxxx">
+    <input id="setup-pin1" type="password" inputmode="numeric" maxlength="6" placeholder="PIN (4-6 dígitos, recomendado)" style="margin-bottom:14px">
     <label>Teléfono Operario (opcional)</label>
     <input id="setup-tel2" type="tel" placeholder="+54 9 11 xxxx-xxxx">
+    <input id="setup-pin2" type="password" inputmode="numeric" maxlength="6" placeholder="PIN (4-6 dígitos, opcional)" style="margin-bottom:14px">
     <label>Teléfono Administrador (opcional)</label>
     <input id="setup-tel3" type="tel" placeholder="+54 9 11 xxxx-xxxx">
+    <input id="setup-pin3" type="password" inputmode="numeric" maxlength="6" placeholder="PIN (4-6 dígitos, opcional)" style="margin-bottom:14px">
     <label>Teléfono Veterinario (opcional)</label>
     <input id="setup-tel4" type="tel" placeholder="+54 9 11 xxxx-xxxx">
+    <input id="setup-pin4" type="password" inputmode="numeric" maxlength="6" placeholder="PIN (4-6 dígitos, opcional)" style="margin-bottom:14px">
     <button class="btn-trial" onclick="startTrial()">🚀 Iniciar prueba gratuita</button>
   </div>
 </div>
@@ -3170,7 +3219,7 @@ window.DB = {
     establecimiento:'La Pampa Brava – Campo El Ombú',
     phones:[{num:'',name:'Titular'},{num:'',name:'Operario'},{num:'',name:'Administrador'},{num:'',name:'Veterinario'}],
     trialStart: null,
-    trialDays: 15,
+    trialDays: 30,
     subscribed: false
   }
 };
@@ -3182,7 +3231,7 @@ const RFID_PESO_CORRELACION_MS = 5000; // ventana máx entre lectura RFID y peso
 // ─── TRIAL / AUTH SYSTEM ───
 const TRIAL_DAYS = 30;
 
-function startTrial() {
+async function startTrial() {
   const nombre    = document.getElementById('setup-nombre').value.trim();
   const email     = document.getElementById('setup-email').value.trim();
   const dni       = document.getElementById('setup-dni').value.trim();
@@ -3222,10 +3271,10 @@ function startTrial() {
   DB.settings.registroUsuario = registro;
 
   DB.settings.phones = [
-    {num: t1, name:'Titular', rol:'Dueño'},
-    {num: document.getElementById('setup-tel2').value.trim(), name:'Operario', rol:'Peón'},
-    {num: document.getElementById('setup-tel3').value.trim(), name:'Administrador', rol:'Dueño'},
-    {num: document.getElementById('setup-tel4').value.trim(), name:'Veterinario', rol:'Veterinario'}
+    {num: t1, name:'Titular', rol:'Dueño', pinHash: await rfHashPin(document.getElementById('setup-pin1').value)},
+    {num: document.getElementById('setup-tel2').value.trim(), name:'Operario', rol:'Peón', pinHash: await rfHashPin(document.getElementById('setup-pin2').value)},
+    {num: document.getElementById('setup-tel3').value.trim(), name:'Administrador', rol:'Dueño', pinHash: await rfHashPin(document.getElementById('setup-pin3').value)},
+    {num: document.getElementById('setup-tel4').value.trim(), name:'Veterinario', rol:'Veterinario', pinHash: await rfHashPin(document.getElementById('setup-pin4').value)}
   ];
   DB.settings.trialStart = Date.now();
   DB.settings.establecimiento = estab || 'Mi Establecimiento';
@@ -3245,6 +3294,15 @@ function startTrial() {
   document.getElementById('app').style.display = 'grid';
   document.getElementById('estab-name').value = DB.settings.establecimiento;
   init();
+}
+
+// ── PIN por usuario: segundo factor además del número de teléfono.
+//    Se guarda hasheado (SHA-256), nunca en texto plano. ──
+async function rfHashPin(pin) {
+  if (!pin) return null;
+  const enc = new TextEncoder().encode(String(pin).trim());
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
 async function checkAuth() {
@@ -3300,7 +3358,7 @@ function showLoginScreen() {
   const phones = (DB.settings.phones || []).filter(p => p.num);
   const list = document.getElementById('login-phone-list');
   list.innerHTML = phones.map((p,i) => `
-    <div class="login-phone-item" onclick="selectLoginPhone('${p.num}', this)">
+    <div class="login-phone-item" onclick="selectLoginPhone(${i}, this)">
       <div>
         <div class="login-phone-num">${maskPhone(p.num)}</div>
         <div class="login-phone-name">${p.name}</div>
@@ -3313,10 +3371,11 @@ function maskPhone(num) {
   return num.slice(0,-4).replace(/\d/g,'*') + num.slice(-4);
 }
 
-function selectLoginPhone(num, el) {
+function selectLoginPhone(idx, el) {
   document.querySelectorAll('.login-phone-item').forEach(x => x.classList.remove('active'));
   el.classList.add('active');
-  el.dataset.num = num;
+  const phones = (DB.settings.phones || []).filter(p => p.num);
+  el.dataset.num = phones[idx]?.num || '';
   document.getElementById('login-manual').value = '';
 }
 
@@ -3334,6 +3393,20 @@ async function doLogin() {
   const idx = exactIdx!==-1 ? exactIdx : partialIdx;
   if(!clean || idx===-1) {
     toast('Número no autorizado ⛔','err'); return;
+  }
+
+  // Si este usuario tiene PIN configurado, es obligatorio para tomar su rol
+  // (evita que cualquiera con el dispositivo a mano entre como Dueño con solo
+  // tocar/adivinar el número, sin más verificación).
+  const usuarioCandidato = phoneObjs[idx] || {};
+  if (usuarioCandidato.pinHash) {
+    const pinIngresado = prompt(`Ingresá el PIN de ${usuarioCandidato.name || 'este usuario'}:`);
+    if (!pinIngresado) return;
+    const hashIngresado = await rfHashPin(pinIngresado);
+    if (hashIngresado !== usuarioCandidato.pinHash) {
+      toast('PIN incorrecto ⛔', 'err');
+      return;
+    }
   }
 
   // Validar que la suscripción/trial sigan vigentes (anti-manipulación)
@@ -3393,33 +3466,40 @@ function mostrarDatosPago() {
   }
 }
 
-const VALID_CODES = new Set(["06ZO", "0BG6", "0CWX", "0IE8", "0ZFH", "146X", "1F14", "25XZ", "28RN", "28SI", "2B80", "2BQ1", "2CGF", "2GLG", "2KMB", "2TVL", "2TW5", "2UIY", "30B5", "30WA", "37P7", "3FMZ", "3NU6", "3YHK", "41YI", "4898", "4IDQ", "4M0U", "4VM5", "5280", "5328", "53KW", "594X", "5DDG", "5IX9", "5NWM", "6163", "65Y2", "6L87", "6N1D", "6N3Z", "6NA9", "6W6U", "6ZG2", "6ZLB", "7NHE", "7RZZ", "7U8P", "805O", "80NM", "84DN", "879F", "8F2J", "8MZ2", "8OMF", "8UE3", "8WA0", "937U", "96IW", "97ER", "9BH9", "9GGD", "9LB3", "9N3C", "9Q32", "9Q7K", "9XZC", "A1GY", "A2CQ", "AGDY", "AIBT", "AQ9G", "AQAC", "B5OR", "BHPE", "BSUM", "BUJ2", "CBHE", "COAT", "CYKL", "DAKW", "DHM5", "DPXC", "E1OU", "EKQ2", "ETGJ", "EVIK", "EX6C", "EZZD", "FARX", "FCU9", "FP0D", "FRQH", "FX95", "G13H", "GCM6", "GKMT", "GQM9", "GVEQ", "GWF4", "H47A", "H55Y", "HM79", "HUSH", "HWBG", "HYF3", "I4L2", "I5O2", "I6XZ", "IFVX", "IJ5K", "IN0E", "IONA", "ISWP", "IT8B", "J66L", "JGA9", "JQUN", "KGYD", "KKQS", "KUMS", "KVQ0", "L1KI", "L5GX", "LJNA", "LMD2", "LUET", "LXX1", "M1A2", "M4H4", "NKZQ", "NT4N", "NZT7", "OE1H", "OHID", "OLJ6", "OQEW", "OQN5", "P1AW", "PIRJ", "PUAR", "PY1M", "PZN8", "Q40A", "Q4L0", "Q824", "QK9W", "QKNY", "QQN9", "RP6L", "RUZX", "S7C2", "ST6C", "T02E", "T1RK", "T7KN", "TA1U", "TLNN", "U4JC", "U9XH", "UARV", "UC6G", "UX19", "UXHD", "V0YQ", "V2JV", "V95L", "V997", "VG3N", "VH52", "VKV6", "VNB9", "VYC1", "W43C", "WHXM", "WJLQ", "WMMF", "WOBI", "WROK", "WRZ8", "WXO5", "X4C7", "X62W", "XEIJ", "XM0T", "Y6RJ", "Y6V8", "Y7XC", "YGGH", "YHHL", "YL2U", "YNZH", "YU2K", "YVKY", "YXU9", "Z0HO", "Z6KD", "Z6O2", "ZVJI", "ZXPL"]);
-
 async function checkActivation() {
   const code = prompt('Ingresá el código de activación recibido por WhatsApp:');
   if(!code) return;
   const c = code.toUpperCase().trim();
-  const isMaster = c === 'RODEOFLOWABEJORRO';
-  const isValidCode = VALID_CODES.has(c);
 
-  if(!isMaster && !isValidCode) {
-    toast('Código inválido','err'); return;
+  const estabId = window.ESTAB_ID_ACTIVO;
+  if (!estabId) { toast('No hay establecimiento activo', 'err'); return; }
+
+  toast('Verificando código...', 'info');
+  try {
+    await firebase.auth().signInAnonymously().catch(() => {}); // asegura sesión
+    const fn = firebase.app().functions('us-central1').httpsCallable('validarCodigoActivacion');
+    // NOTA DE SEGURIDAD: la Cloud Function debe escribir el resultado en
+    // establecimientos/{estabId}/suscripcion (además o en lugar de
+    // collections/settings), y las Reglas de Firebase deben tener
+    // ".write": false ahí para cualquier cliente (la Cloud Function usa
+    // Admin SDK, que no pasa por las reglas, así que igual puede escribir).
+    // Sin esto, el estado optimista de abajo es sólo local a este dispositivo
+    // hasta que llegue el valor autoritativo por el listener de 'suscripcion'.
+    await fn({ estabId, code: c });
+  } catch (e) {
+    const msg = e?.message === 'Este código ya fue utilizado.'
+      ? 'Este código ya fue utilizado'
+      : (e?.message || 'Código inválido');
+    toast(msg, 'err');
+    return;
   }
 
-  // Verificar si el código de 4 dígitos ya fue usado en este dispositivo
-  if(isValidCode) {
-    const usedCodes = JSON.parse((await rfGetItem('rf_used_codes')) || '[]');
-    if(usedCodes.includes(c)) {
-      toast('Este código ya fue utilizado','err'); return;
-    }
-    // Marcar como usado en este dispositivo
-    usedCodes.push(c);
-    rfSetItem('rf_used_codes', JSON.stringify(usedCodes));
-  }
-
+  // La Cloud Function ya escribió subscribed/activationDate en Firebase.
+  // Actualizamos el estado local también para que la UI reaccione al toque,
+  // sin esperar la vuelta del listener de sync.
   DB.settings.subscribed = true;
   DB.settings.activationCode = c;
-  DB.settings.activationDate = Date.now(); // inicio de los 30 días
+  DB.settings.activationDate = Date.now();
   DB.settings.schemaVersion = DB_SCHEMA_VERSION;
   await anclarTiempo();
   saveToStorage();
@@ -6412,18 +6492,25 @@ function renderConfigPhones(){
       <select id="cfg-phone-rol-${i}" class="form-control" style="width:auto;padding:3px 6px;font-size:12px">
         ${roles.map(r=>`<option ${((p.rol||'Dueño')===r)?'selected':''}>${r}</option>`).join('')}
       </select>
+      <input type="password" id="cfg-phone-pin-${i}" inputmode="numeric" maxlength="6"
+        placeholder="${p.pinHash?'PIN configurado — dejar vacío para no cambiar':'Sin PIN — recomendado'}"
+        style="width:auto;max-width:110px">
     </div>`).join('');
   const cfg=document.getElementById('config-estab');
   if(cfg)cfg.value=DB.settings.establecimiento||'';
 }
 
-function savePhoneConfig(){
+async function savePhoneConfig(){
   const phones=DB.settings.phones||[{name:'Titular'},{name:'Operario'},{name:'Administrador'},{name:'Veterinario'}];
-  [0,1,2,3].forEach(i=>{
+  for (const i of [0,1,2,3]) {
     const el=document.getElementById('cfg-phone-'+i);
     const rolEl=document.getElementById('cfg-phone-rol-'+i);
-    if(el&&phones[i]){phones[i].num=el.value.trim(); phones[i].rol=rolEl?rolEl.value:'Dueño';}
-  });
+    const pinEl=document.getElementById('cfg-phone-pin-'+i);
+    if(el&&phones[i]){
+      phones[i].num=el.value.trim(); phones[i].rol=rolEl?rolEl.value:'Dueño';
+      if (pinEl && pinEl.value.trim()) phones[i].pinHash = await rfHashPin(pinEl.value.trim());
+    }
+  }
   DB.settings.phones=phones;
   saveToStorage();
   toast('Teléfonos y roles guardados ✅','ok');
@@ -6545,7 +6632,7 @@ function confirmReset(){
       raspajes:[], sangrados:[],
       settings:{
         establecimiento: estab||'Mi Establecimiento',
-        phones, trialStart:ts, trialDays:15,
+        phones, trialStart:ts, trialDays:30,
         subscribed:sub, activationDate:actDate, activationCode:actCode
       }
     };
@@ -9717,7 +9804,14 @@ function genEstabId() {
   let w2 = ESTAB_ID_PALABRAS[Math.floor(Math.random()*ESTAB_ID_PALABRAS.length)];
   while(w2===w1){ w2 = ESTAB_ID_PALABRAS[Math.floor(Math.random()*ESTAB_ID_PALABRAS.length)]; }
   const num = Math.floor(1000 + Math.random()*9000);
-  return `${w1}-${w2}-${num}`;
+  // Sufijo criptográficamente aleatorio: eleva la entropía del ID de ~7.8M
+  // combinaciones (adivinable/fuerza-bruteable vía REST de Firebase con auth
+  // anónima) a ~2.8x10^12 combinaciones adicionales. El ID sigue siendo
+  // "compartible" (se copia/envía por WhatsApp, no se tipea a mano).
+  const bytes = new Uint8Array(6);
+  (window.crypto || window.msCrypto).getRandomValues(bytes);
+  const suf = Array.from(bytes, b => b.toString(36).padStart(2,'0')).join('').slice(0,8);
+  return `${w1}-${w2}-${num}-${suf}`;
 }
 
 // ── Cargar lista de establecimientos ─────────────────
@@ -9952,10 +10046,10 @@ async function unirseAEstablecimiento(codigo) {
     .toLowerCase()
     .replace(/[\u2010-\u2015\u2212]/g, '-')   // normaliza rayas "inteligentes" del teclado (– — −) a guion simple
     .replace(/\s+/g, '');                       // saca espacios que a veces mete el autocorrector
-  const formatoNuevo = /^[a-z]+-[a-z]+-\d{4}$/.test(codigo);
+  const formatoNuevo = /^[a-z]+-[a-z]+-\d{4}(-[a-z0-9]{6,8})?$/.test(codigo);
   const formatoViejo = codigo.startsWith('estab_');
   if (!formatoNuevo && !formatoViejo) {
-    toast('Código inválido. Debe tener el formato "palabra-palabra-1234" (ej: campo-toro-4821)', 'err');
+    toast('Código inválido. Debe tener el formato "palabra-palabra-1234-xxxxxx" (ej: campo-toro-4821-a1b2c3)', 'err');
     return;
   }
   try {
