@@ -230,8 +230,72 @@
   }
 
   // ── Iniciar listener ─────────────────────────────────
+  // ── Sistema de miembros por establecimiento ──────────
+  // Objetivo: que las Reglas de Firebase puedan negar lectura/escritura a
+  // cualquiera que no sea miembro de ESE establecimiento (hoy solo exigen
+  // "auth != null", que cumple cualquier anónimo que conozca/adivine el ID).
+  //
+  // Cómo funciona sin necesitar una Cloud Function:
+  //  - establecimientos/{id}/members/{uid}: true  → lista de dispositivos autorizados.
+  //  - Si el establecimiento es nuevo, o todavía no tiene members (establecimientos
+  //    viejos de antes de este cambio), cualquiera puede auto-agregarse UNA vez
+  //    (arranca la lista). Después de eso, un dispositivo nuevo tiene que pedir
+  //    permiso: escribe en solicitudes/{uid}, y CUALQUIER dispositivo miembro que
+  //    esté sincronizando en ese momento lo aprueba automáticamente (lo agrega a
+  //    members y borra la solicitud). No hace falta que el Titular esté online
+  //    en el momento exacto — cualquier dispositivo ya autorizado sirve.
+  let _refSolicitudes = null;
+
+  async function asegurarMembresia(estabId) {
+    const uid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
+    if (!uid) throw new Error('Sin sesión de Firebase Auth');
+    const estabRef = rtdb.ref(`establecimientos/${estabId}`);
+    const snap = await estabRef.once('value');
+
+    if (!snap.child('members').exists()) {
+      // Establecimiento nuevo, o viejo de antes del sistema de miembros: me auto-agrego.
+      await estabRef.child('members/' + uid).set(true);
+      // Índice liviano (solo existencia, sin datos) para poder validar códigos
+      // desde unirseAEstablecimiento sin necesitar ya ser miembro para leer.
+      await rtdb.ref('estabs_index/' + estabId).set(true);
+      return;
+    }
+    if (snap.child('members/' + uid).exists()) {
+      return; // ya soy miembro
+    }
+
+    // No soy miembro todavía: pido acceso y espero que otro dispositivo autorizado
+    // que esté online lo apruebe.
+    setSyncStatus('error');
+    toast('Esperando aprobación de otro dispositivo ya autorizado de este establecimiento…', 'err');
+    await estabRef.child('solicitudes/' + uid).set({
+      ts: firebase.database.ServerValue.TIMESTAMP,
+      dispositivo: window._rfDeviceId
+    });
+    await new Promise(resolve => {
+      const refMiMembresia = estabRef.child('members/' + uid);
+      refMiMembresia.on('value', s => {
+        if (s.val() === true) { refMiMembresia.off(); resolve(); }
+      });
+    });
+  }
+
+  // Corre en cada dispositivo que YA es miembro: aprueba automáticamente
+  // solicitudes de acceso pendientes de otros dispositivos del mismo establecimiento.
+  function procesarSolicitudesPendientes(estabId) {
+    if (_refSolicitudes) { _refSolicitudes.off(); }
+    _refSolicitudes = rtdb.ref(`establecimientos/${estabId}/solicitudes`);
+    _refSolicitudes.on('child_added', snap => {
+      const uidSolicitante = snap.key;
+      rtdb.ref(`establecimientos/${estabId}/members/${uidSolicitante}`).set(true)
+        .then(() => snap.ref.remove())
+        .catch(e => console.warn('No se pudo aprobar solicitud:', e));
+    });
+  }
+
   window.iniciarSync = async function(estabId) {
     await _authPromise; // esperar sesión de Firebase Auth antes de leer/escribir
+    await asegurarMembresia(estabId); // garantizar (o esperar) acceso autorizado a ESTE establecimiento
     if (_refColecciones) { _refColecciones.off(); _refColecciones = null; }
     _cargaInicialLista = false;
     Object.keys(_ultimoJSONPorColeccion).forEach(k => delete _ultimoJSONPorColeccion[k]);
@@ -240,13 +304,18 @@
     try { await migrarSiHaceFalta(estabId); } catch(e) { console.warn('Migración falló:', e); }
 
     _refColecciones = rtdb.ref(`establecimientos/${estabId}/collections`);
+    procesarSolicitudesPendientes(estabId);
 
-    // ── Estado de suscripción: nodo aparte, de sólo-lectura para el cliente.
-    //    Sólo lo escribe la Cloud Function validarCodigoActivacion (Admin SDK,
-    //    no pasa por las reglas). Las reglas de Firebase deben tener
-    //    ".write": false para este path — ver nota en checkActivation().
+    // ── Estado de suscripción: nodo TOP-LEVEL aparte (suscripciones/{id}),
+    //    fuera del árbol de 'establecimientos', de sólo-lectura para el cliente.
+    //    Tiene que vivir afuera de establecimientos/$estabId porque en Firebase
+    //    RTDB los permisos cascadean hacia abajo y no se pueden revocar en un
+    //    nivel más profundo: si dejáramos esto como hijo de $estabId, cualquier
+    //    .write permisivo en el padre (para los miembros) taparía el .write:false
+    //    de acá. Sólo la Cloud Function validarCodigoActivacion (Admin SDK,
+    //    no pasa por las reglas) puede escribir en suscripciones/{id}.
     if (_refSuscripcion) { _refSuscripcion.off(); }
-    _refSuscripcion = rtdb.ref(`establecimientos/${estabId}/suscripcion`);
+    _refSuscripcion = rtdb.ref(`suscripciones/${estabId}`);
     _refSuscripcion.on('value', snap => {
       const s = snap.val();
       if (!s || !window.DB || !window.DB.settings) return;
@@ -277,6 +346,7 @@
   window.detenerSync = function() {
     if (_refColecciones) { _refColecciones.off(); _refColecciones = null; }
     if (_refSuscripcion) { _refSuscripcion.off(); _refSuscripcion = null; }
+    if (_refSolicitudes) { _refSolicitudes.off(); _refSolicitudes = null; }
     setSyncStatus('off');
   };
 
@@ -3485,12 +3555,12 @@ async function checkActivation() {
     await firebase.auth().signInAnonymously().catch(() => {}); // asegura sesión
     const fn = firebase.app().functions('us-central1').httpsCallable('validarCodigoActivacion');
     // NOTA DE SEGURIDAD: la Cloud Function debe escribir el resultado en
-    // establecimientos/{estabId}/suscripcion (además o en lugar de
-    // collections/settings), y las Reglas de Firebase deben tener
-    // ".write": false ahí para cualquier cliente (la Cloud Function usa
-    // Admin SDK, que no pasa por las reglas, así que igual puede escribir).
-    // Sin esto, el estado optimista de abajo es sólo local a este dispositivo
-    // hasta que llegue el valor autoritativo por el listener de 'suscripcion'.
+    // suscripciones/{estabId} (nodo TOP-LEVEL, no dentro de establecimientos/
+    // {estabId} — ver comentario en iniciarSync sobre por qué). Las Reglas de
+    // Firebase ya tienen ".write": false ahí para cualquier cliente (la Cloud
+    // Function usa Admin SDK, que no pasa por las reglas, así que igual puede
+    // escribir). Sin esto, el estado optimista de abajo es sólo local a este
+    // dispositivo hasta que llegue el valor autoritativo por el listener.
     await fn({ estabId, code: c });
   } catch (e) {
     const msg = e?.message === 'Este código ya fue utilizado.'
@@ -10075,34 +10145,24 @@ async function unirseAEstablecimiento(codigo) {
     return false;
   }
   try {
-    // Verificar que exista en Firebase antes de unirse.
-    // Chequeamos tanto el modelo nuevo (collections, que se escribe al instante)
-    // como el blob viejo (por si el establecimiento es antiguo o recién creado).
+    // Verificar que exista, usando el índice liviano (solo existencia, sin
+    // datos) — con el sistema de miembros, ya NO se puede leer el contenido
+    // real de un establecimiento ajeno antes de tener membresía aprobada.
     const dbRef = firebase.database();
-    const [snapCol, snapLegacy] = await Promise.all([
-      dbRef.ref('establecimientos/' + codigo + '/collections').once('value'),
-      dbRef.ref('establecimientos/' + codigo).once('value')
-    ]);
-    if (!snapCol.exists() && !snapLegacy.exists()) {
+    const snapIndex = await dbRef.ref('estabs_index/' + codigo).once('value');
+    if (!snapIndex.exists()) {
       toast('No se encontró ese establecimiento. Verificá el código.', 'err');
       return false;
     }
-    // Agregar a la lista local
+    // Agregar a la lista local (el nombre real se completa solo apenas
+    // sincronice, una vez aprobada la membresía)
     const lista = await getEstablecimientos();
     if (!lista.find(e => e.id === codigo)) {
-      let nombre = 'Establecimiento compartido';
-      try {
-        if (snapCol.exists() && snapCol.val().settings) {
-          nombre = JSON.parse(snapCol.val().settings.data).establecimiento || nombre;
-        } else if (snapLegacy.exists()) {
-          nombre = JSON.parse(snapLegacy.val().data).settings?.establecimiento || nombre;
-        }
-      } catch(e) {}
-      lista.push({ id: codigo, nombre, creadoEn: Date.now(), compartido: true });
+      lista.push({ id: codigo, nombre: 'Establecimiento compartido', creadoEn: Date.now(), compartido: true });
       await saveEstablecimientos(lista);
     }
     await cambiarEstablecimiento(codigo);
-    toast('¡Unido! Sincronizando datos...', 'ok');
+    toast('Solicitud enviada. Sincronizando apenas se apruebe…', 'ok');
     return true;
   } catch(e) {
     toast('Error al unirse: ' + e.message, 'err');
