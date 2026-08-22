@@ -737,6 +737,12 @@
     <input id="setup-tel4" type="tel" placeholder="+54 9 11 xxxx-xxxx">
     <input id="setup-pin4" type="password" inputmode="numeric" maxlength="6" placeholder="PIN (4-6 dígitos, opcional)" style="margin-bottom:14px">
     <button class="btn-trial" onclick="startTrial()">🚀 Iniciar prueba gratuita</button>
+
+    <div style="text-align:center;margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+      <div style="font-size:13px;color:var(--text3);margin-bottom:8px">¿Ya tenés RodeoFlow en otro dispositivo (celular, tablet, PC)?</div>
+      <input id="setup-codigo-existente" type="text" placeholder="Código de establecimiento (ej: campo-toro-4821-a1b2c3)" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" style="font-family:monospace;font-size:12px;margin-bottom:8px">
+      <button class="btn-secondary" onclick="unirseDesdeSetup()" style="width:100%">🔗 Unirse a establecimiento existente</button>
+    </div>
   </div>
 </div>
 
@@ -10040,6 +10046,22 @@ function actualizarPanelSync() {
 
 
 // ── Unirse a un establecimiento existente por código ──
+// ── Unirse a un establecimiento existente directo desde la pantalla de
+//    setup inicial (dispositivo nuevo o que perdió su almacenamiento local,
+//    sin tener que crear primero un establecimiento vacío de relleno) ──
+async function unirseDesdeSetup() {
+  const input = document.getElementById('setup-codigo-existente');
+  const codigo = (input?.value || '').trim();
+  if (!codigo) {
+    toast('Pegá el código de tu establecimiento', 'err');
+    return;
+  }
+  const ok = await unirseAEstablecimiento(codigo);
+  if (ok) {
+    document.getElementById('trial-screen').style.display = 'none';
+  }
+}
+
 async function unirseAEstablecimiento(codigo) {
   codigo = (codigo || '')
     .trim()
@@ -10050,7 +10072,7 @@ async function unirseAEstablecimiento(codigo) {
   const formatoViejo = codigo.startsWith('estab_');
   if (!formatoNuevo && !formatoViejo) {
     toast('Código inválido. Debe tener el formato "palabra-palabra-1234-xxxxxx" (ej: campo-toro-4821-a1b2c3)', 'err');
-    return;
+    return false;
   }
   try {
     // Verificar que exista en Firebase antes de unirse.
@@ -10063,7 +10085,7 @@ async function unirseAEstablecimiento(codigo) {
     ]);
     if (!snapCol.exists() && !snapLegacy.exists()) {
       toast('No se encontró ese establecimiento. Verificá el código.', 'err');
-      return;
+      return false;
     }
     // Agregar a la lista local
     const lista = await getEstablecimientos();
@@ -10081,8 +10103,10 @@ async function unirseAEstablecimiento(codigo) {
     }
     await cambiarEstablecimiento(codigo);
     toast('¡Unido! Sincronizando datos...', 'ok');
+    return true;
   } catch(e) {
     toast('Error al unirse: ' + e.message, 'err');
+    return false;
   }
 }
 
