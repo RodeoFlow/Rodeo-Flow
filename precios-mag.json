@@ -1,12 +1,12 @@
 {
-  "fecha_scrape": "2026-08-25T13:40:38.812Z",
+  "fecha_scrape": "2026-08-25T14:26:13.124Z",
   "fecha_mercado": "25/08/2026",
   "fuente": "MAG - Mercado Agroganadero (mercadoagroganadero.com.ar, scraping automático diario)",
   "categorias": {
     "Novillo": {
       "min": 3200,
-      "max": 4770,
-      "prom": 3985
+      "max": 4800,
+      "prom": 4000
     },
     "Novillito": {
       "min": 3000,
@@ -15,8 +15,8 @@
     },
     "Vaquillona": {
       "min": 2500,
-      "max": 4700,
-      "prom": 3600
+      "max": 5250,
+      "prom": 3875
     },
     "Vaca Invernada": {
       "min": 2000,
@@ -34,6 +34,6 @@
       "prom": 2950
     }
   },
-  "indice_arrendamiento_novillo_kg_ha": 4435.531,
+  "indice_arrendamiento_novillo_kg_ha": 4436.068,
   "ok": true
 }
