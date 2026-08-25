@@ -120,12 +120,16 @@
         // Preservar el estado de suscripción local: el payload remoto de 'settings'
         // ya no lo incluye (ver pushSyncFirebase). La fuente de verdad de subscribed/
         // activationDate/activationCode es el nodo aparte 'suscripcion' (listener abajo).
+        // También blindamos hasBeenSetup: si ya estaba en true localmente, un remoto
+        // incompleto/viejo nunca lo puede volver a poner en false (eso era lo que
+        // hacía reaparecer la pantalla de setup sobre un establecimiento con datos reales).
         const prev = window.DB.settings || {};
         window.DB[key] = {
           ...parsed,
           subscribed:      prev.subscribed,
           activationDate:  prev.activationDate,
-          activationCode:  prev.activationCode
+          activationCode:  prev.activationCode,
+          hasBeenSetup:    parsed.hasBeenSetup || prev.hasBeenSetup || false
         };
       } else {
         window.DB[key] = parsed;
@@ -3336,6 +3340,27 @@ async function startTrial() {
     alert('Completá estos datos antes de iniciar la prueba:\n\n' + faltantes.join('\n'));
     return;
   }
+
+  // SEGURIDAD: "Iniciar prueba gratuita" tiene que crear SIEMPRE un
+  // establecimiento nuevo y separado — nunca debe pisar/reutilizar el que
+  // ya esté cargado en memoria (aunque sea por un bug de sync que muestre
+  // esta pantalla de setup por error). Si no se hiciera así, cualquiera que
+  // viera esta pantalla podría completarla con datos inventados y terminar
+  // operando sobre un establecimiento real ajeno, pisando su nombre/teléfonos
+  // con los datos falsos.
+  if (window.ESTAB_ID_ACTIVO) {
+    try { await saveEstabActivo(); } catch(e) {} // no perder nada de lo que hubiera cargado
+  }
+  const nuevoId = genEstabId();
+  DB = dbVacia(estab || 'Mi Establecimiento');
+  ESTAB_ID_ACTIVO = nuevoId;
+  window.ESTAB_ID_ACTIVO = nuevoId;
+  try {
+    const lista = await getEstablecimientos();
+    lista.push({ id: nuevoId, nombre: estab || 'Mi Establecimiento', creadoEn: Date.now() });
+    await saveEstablecimientos(lista);
+    await idbSet(RF_ACTIVO_KEY, nuevoId);
+  } catch(e) { console.warn('No se pudo registrar el nuevo establecimiento:', e); }
 
   // Datos del usuario (planilla de registro inicial)
   const registro = {
