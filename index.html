@@ -828,7 +828,7 @@
     <div style="font-size:36px;margin-bottom:8px">⛔</div>
     <h2>Período de prueba finalizado</h2>
     <p>Tu prueba gratuita de 30 días ha expirado. Activá tu suscripción para continuar usando RodeoFlow.</p>
-    <div class="paywall-price">USD 30 <span>/ mes</span></div>
+    <div class="paywall-price">USD 46 <span>/ mes</span></div>
     <p style="font-size:14px;color:var(--text3);margin-bottom:8px">≈ ARS <span id="paywall-ars-equiv">calculando...</span> al dólar oficial BNA</p>
     <p style="font-size:14px;color:var(--text3);margin-bottom:20px">Acceso completo · Sin límites · Soporte incluido</p>
     <button class="btn-pay" onclick="mostrarDatosPago()">💳 Ver datos de transferencia</button>
@@ -2180,6 +2180,7 @@
           <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn-pay" style="padding:10px 20px;font-size:13px;border-radius:8px" onclick="mostrarDatosPago()">💳 Transferencia bancaria</button>
             <button class="btn-activate" style="padding:10px 20px;font-size:13px" onclick="checkActivation()">🔑 Activar</button>
+            <button class="btn-secondary" style="padding:10px 20px;font-size:13px;color:var(--red)" onclick="abrirModalCancelacion()">❌ Cancelar suscripción</button>
           </div>
         </div>
       </div>
@@ -2297,6 +2298,30 @@
 <!-- ═══════════════════════════════════════════════════
      MODAL: CARGA POR WHATSAPP / AUDIO
 ════════════════════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════════════════
+     MODAL: CANCELACIÓN DE SUSCRIPCIÓN
+════════════════════════════════════════════════════ -->
+<div id="modal-cancelacion" class="modal-overlay">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">❌ Cancelar suscripción</div>
+      <button class="modal-close" onclick="closeModal('modal-cancelacion')">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Contanos por qué cancelás — nos ayuda a mejorar. La baja se procesa apenas la recibamos.</p>
+    <div id="cancelacion-motivos" style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn-secondary" style="text-align:left" onclick="enviarCancelacion('Muy caro / no me alcanza el presupuesto')">💰 Muy caro / no me alcanza el presupuesto</button>
+      <button class="btn-secondary" style="text-align:left" onclick="enviarCancelacion('No lo uso lo suficiente')">📉 No lo uso lo suficiente</button>
+      <button class="btn-secondary" style="text-align:left" onclick="enviarCancelacion('Encontré otra alternativa')">🔄 Encontré otra alternativa</button>
+      <button class="btn-secondary" style="text-align:left" onclick="enviarCancelacion('Problemas técnicos / errores')">🐛 Problemas técnicos / errores</button>
+      <button class="btn-secondary" style="text-align:left" onclick="mostrarMotivoOtro()">✏️ Otro motivo</button>
+    </div>
+    <div id="cancelacion-otro-box" style="display:none;margin-top:10px">
+      <textarea id="cancelacion-otro-texto" class="form-control" rows="3" placeholder="Contanos brevemente el motivo..."></textarea>
+      <button class="btn-primary" style="margin-top:8px;width:100%" onclick="enviarCancelacionOtro()">Enviar solicitud de baja</button>
+    </div>
+  </div>
+</div>
+
 <div id="modal-whatsapp-entrada" class="modal-overlay">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
@@ -3555,16 +3580,52 @@ function updateTrialTag(trialDaysLeft, subActive, subDaysLeft) {
 
 // ─── PAGO: TRANSFERENCIA DIRECTA ───
 const CVU_ALIAS = 'CMORENO.agromp2';
-const WHATSAPP_PAGO = '5492944000000'; // ← Cambiá por tu número WhatsApp
+const WHATSAPP_PAGO = '5492314446643'; // Número real de contacto/pagos
 
 function openMercadoPago() { mostrarDatosPago(); } // compatibilidad
 function openNaranja()     { mostrarDatosPago(); } // compatibilidad
 
 function mostrarDatosPago() {
-  const msg = `💰 SUSCRIPCIÓN RODEOFLOW\n\nPrecio: USD 30 / mes\n\nTransferí por:\n• Alias: ${CVU_ALIAS}\n• Banco / Billetera: cualquiera (CVU universal)\n\nUna vez transferido enviá el comprobante por WhatsApp para recibir tu código de activación.`;
+  const msg = `💰 SUSCRIPCIÓN RODEOFLOW\n\nPrecio: USD 46 / mes\n\nTransferí por:\n• Alias: ${CVU_ALIAS}\n• Banco / Billetera: cualquiera (CVU universal)\n\nUna vez transferido enviá el comprobante por WhatsApp para recibir tu código de activación.`;
   if(confirm(msg + '\n\n¿Abrir WhatsApp para enviar comprobante?')) {
     window.open('https://wa.me/' + WHATSAPP_PAGO + '?text=' + encodeURIComponent('Hola, realicé el pago de RodeoFlow. Adjunto comprobante.'), '_blank');
   }
+}
+
+// ─── CANCELACIÓN DE SUSCRIPCIÓN ───
+function abrirModalCancelacion() {
+  document.getElementById('cancelacion-otro-box').style.display = 'none';
+  document.getElementById('cancelacion-motivos').style.display = 'flex';
+  openModal('modal-cancelacion');
+}
+
+function mostrarMotivoOtro() {
+  document.getElementById('cancelacion-motivos').style.display = 'none';
+  document.getElementById('cancelacion-otro-box').style.display = 'block';
+}
+
+function enviarCancelacionOtro() {
+  const texto = (document.getElementById('cancelacion-otro-texto').value || '').trim();
+  enviarCancelacion(texto || 'Otro (sin detalle)');
+}
+
+async function enviarCancelacion(motivo) {
+  const estab = DB.settings.establecimiento || 'Sin nombre';
+  const estabId = window.ESTAB_ID_ACTIVO || '';
+  // Guardamos el motivo para nuestro propio seguimiento (mismo patrón que
+  // registros_clientes: cualquiera puede crear una entrada, nadie del
+  // lado cliente puede leerlas de vuelta — son solo tuyas).
+  try {
+    await firebase.database().ref('solicitudes_baja/' + Date.now()).set({
+      estabId, establecimiento: estab, motivo,
+      ts: firebase.database.ServerValue.TIMESTAMP
+    });
+  } catch(e) { console.warn('No se pudo registrar la solicitud de baja:', e); }
+
+  closeModal('modal-cancelacion');
+  const msg = `Hola, quiero cancelar mi suscripción de RodeoFlow.\n\nEstablecimiento: ${estab}\nMotivo: ${motivo}`;
+  window.open('https://wa.me/' + WHATSAPP_PAGO + '?text=' + encodeURIComponent(msg), '_blank');
+  toast('Solicitud de baja enviada. Te vamos a contactar para confirmar.', 'ok');
 }
 
 async function checkActivation() {
@@ -6705,9 +6766,25 @@ function updateTrialStatus(){
       <div style="color:var(--text2);font-size:13px">días restantes de prueba</div>
       <div style="margin-top:8px;font-size:13px;color:var(--text3)">Iniciado: ${new Date(DB.settings.trialStart).toLocaleDateString('es-AR')}</div>
       <div style="font-size:13px;color:var(--text3)">Expira: ${new Date(DB.settings.trialStart+TRIAL_DAYS*86400000).toLocaleDateString('es-AR')}</div>`;
+    avisarProximoVencimiento(daysLeft);
   } else {
     el.innerHTML=`<div style="color:var(--red);font-size:16px;font-weight:600">⛔ Período de prueba expirado</div><div style="color:var(--text2);font-size:14px;margin-top:4px">Activá tu suscripción para continuar</div>`;
   }
+}
+
+// ── Recordatorio de prueba gratuita por vencer ──
+// Avisa cuando quedan 3 días o menos, una sola vez por día (no en cada
+// pantalla/render), para no ser invasivo pero sí evitar sorpresas cuando
+// se corta el acceso.
+function avisarProximoVencimiento(daysLeft){
+  if (daysLeft > 3 || daysLeft <= 0) return;
+  const HOY = new Date().toDateString();
+  if (localStorage.getItem('rf_aviso_trial_fecha') === HOY) return; // ya se avisó hoy
+  localStorage.setItem('rf_aviso_trial_fecha', HOY);
+  const msg = daysLeft === 1
+    ? '⏰ Tu prueba gratuita vence mañana. Activá tu suscripción para no perder el acceso.'
+    : `⏰ Te quedan ${daysLeft} días de prueba gratuita. Activá tu suscripción cuando quieras desde Configuración.`;
+  toast(msg, 'err');
 }
 
 function confirmReset(){
