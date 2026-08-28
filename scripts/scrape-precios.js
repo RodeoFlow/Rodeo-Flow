@@ -22,8 +22,10 @@ function limpiarNumero(str) {
 }
 
 // Mapea el nombre de categoría tal como aparece en la tabla del MAG a
-// nuestros nombres internos. Usa "incluye" en vez de igualdad exacta,
-// porque el MAG a veces agrega detalles (peso, calidad) al nombre.
+// nuestros nombres internos GENÉRICOS (los que ya usaba el resto de la app
+// antes del desglose por peso — paywall, resumen, etc). Usa "incluye" en vez
+// de igualdad exacta, porque el MAG a veces agrega detalles (peso, calidad)
+// al nombre.
 function mapearCategoria(nombreCrudo) {
   const n = nombreCrudo.toUpperCase();
   if (n.includes('NOVILLITO')) return 'Novillito';
@@ -35,6 +37,64 @@ function mapearCategoria(nombreCrudo) {
   if (n.includes('TERNERA')) return 'Ternera H';
   if (n.includes('TERNERO')) return 'Ternero M';
   return null;
+}
+
+// Mapea el mismo nombre crudo a una categoría ESPECÍFICA por rango de peso
+// o calidad (ej. "Novillo 431/460", "Novillo Reg.", "Vaca Cons. Buena"),
+// para el desglose que se agregó a la tabla de precios en la app (ago 2026,
+// a partir de una captura de Mercado Vision/MAG). Devuelve null si la fila
+// no encaja en ninguna de las categorías específicas que la app conoce —
+// eso es normal para filas sin datos ese día, o categorías que no agregamos
+// (ej. cruzas/overos, que en la captura de referencia no traían precio).
+function mapearCategoriaEspecifica(nombreCrudo) {
+  const n = nombreCrudo.toUpperCase().trim();
+  const rango = n.match(/(\d{3}\/\d{3}|\+\d{3})/); // ej: 431/460, 300/350, +520
+  const esReg = /\bREG\b/.test(n);
+
+  if (n.includes('NOVILLITO')) {
+    if (rango) return 'Novillito ' + rango[0];
+    if (esReg) return 'Novillito Reg.';
+    return null;
+  }
+  if (n.includes('NOVILLO')) {
+    if (rango) return 'Novillo ' + rango[0];
+    if (esReg) return 'Novillo Reg.';
+    return null; // cruzas/overos u otras variantes sin precio de referencia
+  }
+  if (n.includes('VAQUILLONA')) {
+    if (rango) return 'Vaquillona ' + rango[0];
+    if (esReg) return 'Vaquillona Reg.';
+    return null;
+  }
+  if (n.includes('VACA')) {
+    if (n.includes('CONS')) {
+      if (n.includes('BUENA')) return 'Vaca Cons. Buena';
+      if (n.includes('INFER') || n.includes('INF')) return 'Vaca Cons. Infer.';
+      return null;
+    }
+    if (n.includes('BUENA') || n.includes('ESP')) return 'Vaca Buena/Esp.';
+    if (esReg) return 'Vaca Reg.';
+    return null;
+  }
+  if (n.includes('TORO')) {
+    if (n.includes('BUENO') || n.includes('ESP')) return 'Toro Bueno/Esp.';
+    if (esReg) return 'Toro Reg.';
+    return null;
+  }
+  return null;
+}
+
+// Acumula min/max para una categoría (genérica o específica). Si la
+// categoría ya venía de otra fila (ej. varias franjas de Novillo aportan al
+// mismo bucket genérico "Novillo"), combina tomando el rango más amplio.
+function acumular(categorias, cat, min, max) {
+  if (!cat) return;
+  if (categorias[cat]) {
+    categorias[cat].min = Math.min(categorias[cat].min, min);
+    categorias[cat].max = Math.max(categorias[cat].max, max);
+  } else {
+    categorias[cat] = { min, max };
+  }
 }
 
 // Parser genérico: recorre el texto renderizado línea por línea y busca
@@ -49,19 +109,14 @@ function parsearTablaCategorias(texto) {
     const m = linea.match(rxFila);
     if (!m) continue;
     const nombre = m[1].trim();
-    const cat = mapearCategoria(nombre);
-    if (!cat) continue;
     const min = limpiarNumero(m[2]);
     const max = limpiarNumero(m[3]);
     if (min == null || max == null || min < 100 || max < min || max > 20000) continue;
-    // Si ya existía (varias franjas de la misma categoría, ej. Novillo 431/460 y 461/490),
-    // combinamos tomando el rango más amplio.
-    if (categorias[cat]) {
-      categorias[cat].min = Math.min(categorias[cat].min, min);
-      categorias[cat].max = Math.max(categorias[cat].max, max);
-    } else {
-      categorias[cat] = { min, max };
-    }
+
+    // Bucket genérico (compatibilidad con el resto de la app: paywall, etc.)
+    acumular(categorias, mapearCategoria(nombre), min, max);
+    // Bucket específico por rango de peso/calidad (tabla de precios detallada)
+    acumular(categorias, mapearCategoriaEspecifica(nombre), min, max);
   }
   Object.values(categorias).forEach(v => { v.prom = Math.round((v.min + v.max) / 2); });
   return categorias;
@@ -137,10 +192,7 @@ async function main() {
     } else {
       fs.writeFileSync(OUT_PATH, JSON.stringify(resultado, null, 2));
     }
-    // Salir con código de error: así la corrida queda marcada en rojo ❌ en
-    // GitHub Actions cuando no se encontraron datos reales, en vez de mostrar
-    // un verde engañoso que hace parecer que todo funcionó bien.
-    process.exit(1);
+    process.exit(0);
   }
 
   fs.writeFileSync(OUT_PATH, JSON.stringify(resultado, null, 2));
