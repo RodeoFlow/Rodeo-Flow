@@ -28,6 +28,12 @@ function limpiarNumero(str) {
 // al nombre.
 function mapearCategoria(nombreCrudo) {
   const n = nombreCrudo.toUpperCase();
+  if (n.includes('INVERNADA')) {
+    if (n.includes('MACHO')) return 'Invernada Machos';
+    if (n.includes('HEMBRA')) return 'Invernada Hembras';
+    if (n.includes('VIENTRE')) return 'Invernada Vientres';
+    return null;
+  }
   if (n.includes('NOVILLITO')) return 'Novillito';
   if (n.includes('NOVILLO')) return 'Novillo';
   if (n.includes('VAQUILLONA')) return 'Vaquillona';
