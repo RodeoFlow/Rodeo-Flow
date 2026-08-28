@@ -1,40 +1,94 @@
 {
-  "fecha_scrape": "2026-08-26T19:53:04.229Z",
-  "fecha_mercado": "26/08/2026",
+  "fecha_scrape": "2026-08-28T22:48:23.355Z",
+  "fecha_mercado": "28/08/2026",
   "fuente": "MAG - Mercado Agroganadero (mercadoagroganadero.com.ar, scraping automático diario)",
   "categorias": {
     "Novillo": {
-      "min": 3600,
-      "max": 4700,
-      "prom": 4150
+      "min": 3400,
+      "max": 4800,
+      "prom": 4100
+    },
+    "Novillo 431/460": {
+      "min": 4250,
+      "max": 4800,
+      "prom": 4525
+    },
+    "Novillo 461/490": {
+      "min": 4300,
+      "max": 4650,
+      "prom": 4475
+    },
+    "Novillo 491/520": {
+      "min": 3800,
+      "max": 4600,
+      "prom": 4200
     },
     "Novillito": {
-      "min": 3200,
+      "min": 4150,
       "max": 5300,
-      "prom": 4250
+      "prom": 4725
+    },
+    "Novillito 300/390": {
+      "min": 4150,
+      "max": 5300,
+      "prom": 4725
+    },
+    "Novillito 391/430": {
+      "min": 4400,
+      "max": 5120,
+      "prom": 4760
     },
     "Vaquillona": {
-      "min": 3000,
-      "max": 5250,
-      "prom": 4125
+      "min": 3400,
+      "max": 5200,
+      "prom": 4300
+    },
+    "Vaquillona 270/390": {
+      "min": 4000,
+      "max": 5200,
+      "prom": 4600
+    },
+    "Vaquillona 391/430": {
+      "min": 3400,
+      "max": 4600,
+      "prom": 4000
     },
     "Vaca Invernada": {
-      "min": 2300,
-      "max": 4200,
+      "min": 2500,
+      "max": 4000,
+      "prom": 3250
+    },
+    "Vaca Buena/Esp.": {
+      "min": 2500,
+      "max": 4000,
       "prom": 3250
     },
     "Vaca Manufactura": {
-      "min": 1900,
+      "min": 2000,
+      "max": 3600,
+      "prom": 2800
+    },
+    "Vaca Cons. Buena": {
+      "min": 2000,
       "max": 2800,
-      "prom": 2350
+      "prom": 2400
+    },
+    "Vaca Cons. Infer.": {
+      "min": 2000,
+      "max": 3600,
+      "prom": 2800
     },
     "Toro": {
-      "min": 2700,
+      "min": 2300,
       "max": 3800,
-      "prom": 3250
+      "prom": 3050
+    },
+    "Toro Bueno/Esp.": {
+      "min": 2300,
+      "max": 3800,
+      "prom": 3050
     }
   },
-  "indice_arrendamiento_novillo_kg_ha": 4244.673,
-  "ok": true,
-  "ultimo_intento_fallido": "2026-08-28T02:06:53.998Z"
+  "indice_arrendamiento_novillo_kg_ha": 4519.701,
+  "ok": true
 }
