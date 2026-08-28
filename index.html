@@ -830,9 +830,13 @@
     <p>Tu prueba gratuita de 30 días ha expirado. Activá tu suscripción para continuar usando RodeoFlow.</p>
     <div class="paywall-price">USD 46 <span>/ mes</span></div>
     <p style="font-size:14px;color:var(--text3);margin-bottom:8px">≈ ARS <span id="paywall-ars-equiv">calculando...</span> al dólar oficial BNA</p>
-    <p style="font-size:14px;color:var(--text3);margin-bottom:20px">Acceso completo · Sin límites · Soporte incluido</p>
+    <p style="font-size:14px;color:var(--text3);margin-bottom:16px">Acceso completo · Sin límites · Soporte incluido</p>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:20px;text-align:left;font-size:12px;color:var(--text3)">
+      🔄 <strong style="color:var(--text2)">Renovación automática:</strong> tu suscripción se renueva y se cobra automáticamente cada 30 días hasta que la canceles. Podés cancelar cuando quieras desde Configuración → "❌ Cancelar suscripción" — la baja se procesa en hasta 2 días hábiles.
+    </div>
     <button class="btn-pay" onclick="mostrarDatosPago()">💳 Ver datos de transferencia</button>
     <button class="btn-activate" onclick="checkActivation()">🔑 Ya pagué – ingresar código</button>
+    <p style="margin-top:10px"><a href="#" onclick="openModal('modal-reglas-pago');return false" style="font-size:12px;color:var(--text3);text-decoration:underline">📋 Ver reglas de pago completas</a></p>
   </div>
 </div>
 
@@ -2181,7 +2185,9 @@
             <button class="btn-pay" style="padding:10px 20px;font-size:13px;border-radius:8px" onclick="mostrarDatosPago()">💳 Transferencia bancaria</button>
             <button class="btn-activate" style="padding:10px 20px;font-size:13px" onclick="checkActivation()">🔑 Activar</button>
             <button class="btn-secondary" style="padding:10px 20px;font-size:13px;color:var(--red)" onclick="abrirModalCancelacion()">❌ Cancelar suscripción</button>
+            <button class="btn-secondary" style="padding:10px 20px;font-size:13px" onclick="openModal('modal-reglas-pago')">📋 Reglas de pago</button>
           </div>
+          <p style="font-size:11px;color:var(--text3);margin-top:10px">🔄 La suscripción se renueva y cobra automáticamente cada 30 días hasta que la canceles. La baja se procesa en hasta 2 días hábiles.</p>
         </div>
       </div>
       <div class="card">
@@ -2301,6 +2307,26 @@
 <!-- ═══════════════════════════════════════════════════
      MODAL: CANCELACIÓN DE SUSCRIPCIÓN
 ════════════════════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════════════════
+     MODAL: REGLAS DE PAGO
+════════════════════════════════════════════════════ -->
+<div id="modal-reglas-pago" class="modal-overlay">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title">📋 Reglas de pago</div>
+      <button class="modal-close" onclick="closeModal('modal-reglas-pago')">✕</button>
+    </div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.7">
+      <p><strong style="color:var(--text)">💵 Precio:</strong> USD 46 por mes, cobrado en su equivalente en pesos argentinos al tipo de cambio oficial BNA del día del pago.</p>
+      <p><strong style="color:var(--text)">💳 Medio de pago:</strong> transferencia bancaria al alias <code>CMORENO.agromp2</code> (CVU universal, cualquier banco/billetera).</p>
+      <p><strong style="color:var(--text)">🔄 Renovación automática:</strong> cada activación habilita 30 días de acceso. Al vencer, se renueva pagando de nuevo y enviando el comprobante — no hay cobro automático a tarjeta, es un proceso manual por WhatsApp.</p>
+      <p><strong style="color:var(--text)">⏳ Días de gracia:</strong> 3 días después del vencimiento antes de cortar el acceso, para dar tiempo a renovar.</p>
+      <p><strong style="color:var(--text)">💸 Reembolsos:</strong> no se hacen reembolsos parciales ni totales una vez pagado el período — el acceso queda habilitado igual hasta el final de los 30 días aunque se cancele antes.</p>
+      <p><strong style="color:var(--text)">❌ Cancelación:</strong> en cualquier momento desde Configuración → "Cancelar suscripción". Se procesa en hasta 2 días hábiles y evita el próximo cobro; no reembolsa el período ya pagado.</p>
+    </div>
+  </div>
+</div>
+
 <div id="modal-cancelacion" class="modal-overlay">
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
@@ -3451,7 +3477,7 @@ async function checkAuth() {
 
   // ── Anclar tiempo y calcular estado (anti-manipulación) ──
   await anclarTiempo();
-  const { inTrial, trialDaysLeft, subActive, subDaysLeft, manipulado } = await calcularEstadoSuscripcion();
+  const { inTrial, trialDaysLeft, subActive, subDaysLeft, subEnGracia, manipulado } = await calcularEstadoSuscripcion();
   if (manipulado) console.warn('🚨 Reloj manipulado detectado en checkAuth');
 
   // ── Decidir si bloquear ──────────────────────────────
@@ -3474,7 +3500,7 @@ async function checkAuth() {
   document.getElementById('trial-screen').style.display = 'none';
   document.getElementById('app').style.display = 'grid';
   document.getElementById('estab-name').value = DB.settings.establecimiento || '';
-  updateTrialTag(trialDaysLeft, subActive, subDaysLeft);
+  updateTrialTag(trialDaysLeft, subActive, subDaysLeft, subEnGracia);
   return true;
 }
 
@@ -3537,7 +3563,7 @@ async function doLogin() {
 
   // Validar que la suscripción/trial sigan vigentes (anti-manipulación)
   await anclarTiempo();
-  const { inTrial: _it, trialDaysLeft, subActive, subDaysLeft } = await calcularEstadoSuscripcion();
+  const { inTrial: _it, trialDaysLeft, subActive, subDaysLeft, subEnGracia } = await calcularEstadoSuscripcion();
   if(trialDaysLeft === 0 && !subActive) {
     // Teléfono válido pero expirado: mandar al paywall
     document.getElementById('login-screen').classList.remove('show');
@@ -3551,14 +3577,17 @@ async function doLogin() {
   sessionStorage.setItem('rf_user_name', usuario.name||'Usuario');
   document.getElementById('login-screen').classList.remove('show');
   document.getElementById('app').style.display = 'grid';
-  updateTrialTag(trialDaysLeft, subActive, subDaysLeft);
+  updateTrialTag(trialDaysLeft, subActive, subDaysLeft, subEnGracia);
   init();
 }
 
-function updateTrialTag(trialDaysLeft, subActive, subDaysLeft) {
+function updateTrialTag(trialDaysLeft, subActive, subDaysLeft, subEnGracia) {
   const tag = document.getElementById('trial-tag');
   if(!tag) return;
-  if(subActive) {
+  if(subEnGracia) {
+    tag.textContent = `⚠ VENCIDO – período de gracia`;
+    tag.className = 'tag-trial warn';
+  } else if(subActive) {
     if(subDaysLeft > 7) {
       tag.textContent = `✅ ACTIVO ${subDaysLeft}d`;
       tag.className = 'tag-trial ok';
@@ -3586,7 +3615,7 @@ function openMercadoPago() { mostrarDatosPago(); } // compatibilidad
 function openNaranja()     { mostrarDatosPago(); } // compatibilidad
 
 function mostrarDatosPago() {
-  const msg = `💰 SUSCRIPCIÓN RODEOFLOW\n\nPrecio: USD 46 / mes\n\nTransferí por:\n• Alias: ${CVU_ALIAS}\n• Banco / Billetera: cualquiera (CVU universal)\n\nUna vez transferido enviá el comprobante por WhatsApp para recibir tu código de activación.`;
+  const msg = `💰 SUSCRIPCIÓN RODEOFLOW\n\nPrecio: USD 46 / mes\n\nTransferí por:\n• Alias: ${CVU_ALIAS}\n• Banco / Billetera: cualquiera (CVU universal)\n\nUna vez transferido enviá el comprobante por WhatsApp para recibir tu código de activación.\n\n🔄 Renovación automática: se cobra cada 30 días hasta que canceles. Cancelación en cualquier momento desde Configuración, se procesa en hasta 2 días hábiles.`;
   if(confirm(msg + '\n\n¿Abrir WhatsApp para enviar comprobante?')) {
     window.open('https://wa.me/' + WHATSAPP_PAGO + '?text=' + encodeURIComponent('Hola, realicé el pago de RodeoFlow. Adjunto comprobante.'), '_blank');
   }
@@ -9837,13 +9866,16 @@ async function calcularEstadoSuscripcion() {
   const trialDaysLeft = Math.max(0, TRIAL_DAYS - trialElapsed);
   const inTrial       = trialDaysLeft > 0;
 
-  let subDaysLeft = 0, subActive = false;
+  const SUB_GRACE_DAYS = 3; // días de gracia después del vencimiento antes de cortar acceso (ver Reglas de pago)
+  let subDaysLeft = 0, subActive = false, subEnGracia = false;
   if (DB.settings.subscribed && DB.settings.activationDate) {
-    subDaysLeft = Math.max(0, 30 - Math.floor((now - DB.settings.activationDate) / 86400000));
-    subActive   = subDaysLeft > 0;
+    const diasTranscurridos = Math.floor((now - DB.settings.activationDate) / 86400000);
+    subDaysLeft  = Math.max(0, 30 - diasTranscurridos);
+    subEnGracia  = diasTranscurridos >= 30 && diasTranscurridos < 30 + SUB_GRACE_DAYS;
+    subActive    = diasTranscurridos < 30 + SUB_GRACE_DAYS;
   }
 
-  return { inTrial, trialDaysLeft, subActive, subDaysLeft, manipulado };
+  return { inTrial, trialDaysLeft, subActive, subDaysLeft, subEnGracia, manipulado };
 }
 
 
