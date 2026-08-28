@@ -4511,7 +4511,32 @@ async function fetchMAGPrices() {
     'Vaca Invernada':{min:3600,prom:3950,max:4300},
     'Vaca Manufactura':{min:3200,prom:3500,max:3800},
     'Toro':{min:3500,prom:3800,max:4100},
-    ...categoriasReferencia
+    // Categorías por rango de peso (ref. Mercado Vision / MAG 26/08/26) —
+    // valores de referencia iniciales; se actualizan cuando el robot
+    // automático los scrapee, si el sitio fuente los publica desglosados.
+    'Novillo 431/460':{min:4200,prom:4600,max:4700},
+    'Novillo 461/490':{min:4200,prom:4600,max:4700},
+    'Novillo 491/520':{min:4400,prom:4500,max:4600},
+    'Novillo +520':{min:4400,prom:4500,max:4600},
+    'Novillo Reg.':{min:3800,prom:4200,max:4200},
+    'Novillito 300/350':{min:5100,prom:5300,max:5300},
+    'Novillito 351/390':{min:4700,prom:4900,max:5100},
+    'Novillito 391/430':{min:4500,prom:4700,max:4800},
+    'Novillito Reg.':{min:4200,prom:4500,max:4500},
+    'Vaquillona 300/350':{min:4800,prom:5100,max:5250},
+    'Vaquillona 351/390':{min:4500,prom:4700,max:4740},
+    'Vaquillona 391/430':{min:4400,prom:4460,max:4520},
+    'Vaquillona Reg.':{min:4000,prom:4400,max:4400},
+    'Vaca Buena/Esp.':{min:3300,prom:3600,max:4300},
+    'Vaca Reg.':{min:3000,prom:3300,max:3300},
+    'Vaca Cons. Buena':{min:2600,prom:2700,max:2800},
+    'Vaca Cons. Infer.':{min:2500,prom:2500,max:2500},
+    'Toro Bueno/Esp.':{min:3600,prom:3630,max:3670},
+    'Toro Reg.':{min:2700,prom:2700,max:2700},
+    // Valores aproximados sin confirmar — corregir cuando haya un precio real de referencia
+    'Invernada Machos':{min:4000,prom:4300,max:4600},
+    'Invernada Hembras':{min:3700,prom:4000,max:4300},
+    'Invernada Vientres':{min:3400,prom:3700,max:4000}
   };
 
   let datos = null;
@@ -4578,7 +4603,15 @@ function updateMAGTable(p) {
   const colores = {
     'Novillo':'var(--amber)','Novillito':'var(--accent)','Vaquillona':'var(--purple)',
     'Ternero M':'var(--green)','Ternera H':'#1abc9c','Vaca Invernada':'var(--blue)',
-    'Vaca Manufactura':'var(--text2)','Toro':'var(--red)'
+    'Vaca Manufactura':'var(--text2)','Toro':'var(--red)',
+    'Novillo 431/460':'var(--amber)','Novillo 461/490':'var(--amber)','Novillo 491/520':'var(--amber)',
+    'Novillo +520':'var(--amber)','Novillo Reg.':'var(--amber)',
+    'Novillito 300/350':'var(--accent)','Novillito 351/390':'var(--accent)','Novillito 391/430':'var(--accent)','Novillito Reg.':'var(--accent)',
+    'Vaquillona 300/350':'var(--purple)','Vaquillona 351/390':'var(--purple)','Vaquillona 391/430':'var(--purple)','Vaquillona Reg.':'var(--purple)',
+    'Vaca Buena/Esp.':'var(--blue)','Vaca Reg.':'var(--blue)',
+    'Vaca Cons. Buena':'var(--text2)','Vaca Cons. Infer.':'var(--text2)',
+    'Toro Bueno/Esp.':'var(--red)','Toro Reg.':'var(--red)',
+    'Invernada Machos':'var(--green)','Invernada Hembras':'#1abc9c','Invernada Vientres':'var(--blue)'
   };
   if(!Object.keys(cats).length) { tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:20px">Sin datos MAG — Actualizá</td></tr>'; return; }
   tbody.innerHTML = Object.entries(cats).map(([cat,v])=>{
