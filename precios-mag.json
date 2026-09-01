@@ -1,5 +1,5 @@
 {
-  "fecha_scrape": "2026-09-01T17:03:39.831Z",
+  "fecha_scrape": "2026-09-01T19:55:11.104Z",
   "fecha_mercado": "01/09/2026",
   "fuente": "MAG - Mercado Agroganadero (mercadoagroganadero.com.ar, scraping automático diario)",
   "categorias": {
@@ -15,8 +15,8 @@
     },
     "Novillo 461/490": {
       "min": 3800,
-      "max": 4750,
-      "prom": 4275
+      "max": 4650,
+      "prom": 4225
     },
     "Novillo 491/520": {
       "min": 3700,
@@ -39,14 +39,14 @@
       "prom": 4450
     },
     "Vaquillona": {
-      "min": 400,
+      "min": 2700,
       "max": 5200,
-      "prom": 2800
+      "prom": 3950
     },
     "Vaquillona 270/390": {
-      "min": 400,
+      "min": 3750,
       "max": 5200,
-      "prom": 2800
+      "prom": 4475
     },
     "Vaquillona 391/430": {
       "min": 2900,
@@ -89,6 +89,6 @@
       "prom": 3075
     }
   },
-  "indice_arrendamiento_novillo_kg_ha": 4326.406,
+  "indice_arrendamiento_novillo_kg_ha": 4322.005,
   "ok": true
 }
