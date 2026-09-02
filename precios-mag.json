@@ -1,94 +1,94 @@
 {
-  "fecha_scrape": "2026-09-01T20:53:13.654Z",
-  "fecha_mercado": "01/09/2026",
+  "fecha_scrape": "2026-09-02T16:55:20.147Z",
+  "fecha_mercado": "02/09/2026",
   "fuente": "MAG - Mercado Agroganadero (mercadoagroganadero.com.ar, scraping automático diario)",
   "categorias": {
     "Novillo": {
-      "min": 2500,
-      "max": 4800,
-      "prom": 3650
+      "min": 3100,
+      "max": 4600,
+      "prom": 3850
     },
     "Novillo 431/460": {
-      "min": 3500,
-      "max": 4800,
-      "prom": 4150
+      "min": 3100,
+      "max": 4600,
+      "prom": 3850
     },
     "Novillo 461/490": {
-      "min": 3800,
-      "max": 4650,
-      "prom": 4225
+      "min": 3600,
+      "max": 4600,
+      "prom": 4100
     },
     "Novillo 491/520": {
-      "min": 3700,
-      "max": 4650,
-      "prom": 4175
+      "min": 3250,
+      "max": 4500,
+      "prom": 3875
     },
     "Novillito": {
-      "min": 3850,
+      "min": 2600,
       "max": 5350,
-      "prom": 4600
+      "prom": 3975
     },
     "Novillito 300/390": {
-      "min": 3850,
+      "min": 3750,
       "max": 5350,
-      "prom": 4600
+      "prom": 4550
     },
     "Novillito 391/430": {
-      "min": 4000,
-      "max": 4900,
-      "prom": 4450
+      "min": 3750,
+      "max": 5000,
+      "prom": 4375
     },
     "Vaquillona": {
-      "min": 2700,
+      "min": 2400,
       "max": 5200,
-      "prom": 3950
+      "prom": 3800
     },
     "Vaquillona 270/390": {
-      "min": 3750,
+      "min": 2400,
       "max": 5200,
-      "prom": 4475
+      "prom": 3800
     },
     "Vaquillona 391/430": {
-      "min": 2900,
-      "max": 4550,
-      "prom": 3725
+      "min": 3200,
+      "max": 4500,
+      "prom": 3850
     },
     "Vaca Invernada": {
-      "min": 1900,
-      "max": 4000,
-      "prom": 2950
+      "min": 2200,
+      "max": 4200,
+      "prom": 3200
     },
     "Vaca Buena/Esp.": {
-      "min": 2000,
-      "max": 4000,
-      "prom": 3000
+      "min": 2400,
+      "max": 4200,
+      "prom": 3300
     },
     "Vaca Manufactura": {
-      "min": 2400,
-      "max": 2800,
-      "prom": 2600
+      "min": 2200,
+      "max": 5000,
+      "prom": 3600
     },
     "Vaca Cons. Buena": {
-      "min": 2400,
+      "min": 2200,
       "max": 2800,
-      "prom": 2600
+      "prom": 2500
     },
     "Vaca Cons. Infer.": {
-      "min": 2600,
-      "max": 2600,
-      "prom": 2600
+      "min": 2200,
+      "max": 5000,
+      "prom": 3600
     },
     "Toro": {
-      "min": 2300,
-      "max": 3850,
-      "prom": 3075
+      "min": 2600,
+      "max": 4000,
+      "prom": 3300
     },
     "Toro Bueno/Esp.": {
-      "min": 2300,
-      "max": 3850,
-      "prom": 3075
+      "min": 2600,
+      "max": 4000,
+      "prom": 3300
     }
   },
-  "indice_arrendamiento_novillo_kg_ha": 4322.005,
+  "indice_arrendamiento_novillo_kg_ha": 4203.461,
   "ok": true
 }
